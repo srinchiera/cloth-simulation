@@ -115,20 +115,20 @@ typedef SgGeometryShapeNode MyShapeNode;
 static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 static shared_ptr<SimpleGeometryPN> g_meshGeometry;
 static Mesh g_mesh;
+// cloth mesh global varaible
+static Mesh g_clothMesh;
+
 static int g_subdLevels = 0;
 
-static const int g_numShells = 24; // constants defining how many layers of shells
-static double g_furHeight = 0.21;
-static double g_hairyness = 0.7;
-
 static shared_ptr<SimpleGeometryPN> g_bunnyGeometry;
-static vector<shared_ptr<SimpleGeometryPNX> > g_bunnyShellGeometries;
 static Mesh g_bunnyMesh;
 
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
 static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node, g_light1, g_light2, g_meshNode;
+// Node for the cloth
+static shared_ptr<SgRbtNode> g_clothMeshNode;
 
 static shared_ptr<SgRbtNode> g_currentCameraNode;
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
@@ -269,7 +269,6 @@ public:
 static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyframes
 static int g_animateFramesPerSecond = 60; // frames to render per second during animation playback
 
-
 static Animator g_animator;
 static Animator::KeyFrameIter g_curKeyFrame;
 static int g_curKeyFrameNum;
@@ -297,6 +296,7 @@ static std::vector<Cvec3> g_tipPos,        // should be hair tip pos in world-sp
 static VertexPN getVertexPN(Mesh& m, const int face, const int vertex); 
 static VertexPNX getFurVertexPNX(Mesh& m, const int face, const int vertex, int shellNum);
 
+/*
 // Specifying shell geometries based on g_tipPos, g_furHeight, and g_numShells.
 // You need to call this function whenver the shell needs to be updated
 static void updateShellGeometry() {
@@ -348,7 +348,13 @@ static void updateShellGeometry() {
   
   // TASK 1 and 3 TODO: finish this function as part of Task 1 and Task 3
 }
+*/
 
+/*
+ *
+ * Hair Simulation Callback
+ *
+ *
 // New glut timer call back that perform dynamics simulation
 // every g_simulationsPerSecond times per second
 static void hairsSimulationCallback(int dontCare) {
@@ -382,14 +388,13 @@ static void hairsSimulationCallback(int dontCare) {
   glutTimerFunc(1000/g_simulationsPerSecond, hairsSimulationCallback, 0);
   glutPostRedisplay(); // signal redisplaying
 }
+*/
 
+/*
 static void initSimulation() {
   g_tipPos.resize(g_bunnyMesh.getNumVertices(), Cvec3(0));
-  g_tipVelocity = g_tipPos;
 
   Mesh m(g_bunnyMesh);
-
-  g_tipPos.clear(); 
 
   // TASK 1 TODO: initialize g_tipPos to "at-rest" hair tips in world coordinates
   for (int i = 0; i < m.getNumFaces(); ++i) {
@@ -403,10 +408,8 @@ static void initSimulation() {
       }
     }
   }
-
-  // Starts hair tip simulation
-  hairsSimulationCallback(0);
 }
+*/
 
 static void initGround() {
   int ibLen, vbLen;
@@ -501,28 +504,6 @@ static VertexPN getVertexPN(Mesh& m, const int face, const int vertex) {
   return VertexPN(v[0], v[1], v[2], n[0], n[1], n[2]);
 }
 
-static VertexPNX getFurVertexPNX(Mesh& m, const int face, const int vertex, int shellNum) {
-  const Mesh::Face f = m.getFace(face);
-
-  const Cvec3 n = f.getVertex(vertex).getNormal();
-
-  const Cvec3 normalizedN = normalize(n);
-  Cvec3 scaleValue = ((normalizedN * (double) g_furHeight) / g_numShells) * shellNum;
-
-  const Cvec3& v = (f.getVertex(vertex).getPosition()) + scaleValue;
-
-  Cvec2 t;
-  if (vertex == 0) {
-    t = Cvec2(0,0);
-  } else if (vertex == 1) {
-    t = Cvec2(g_hairyness,0);
-  } else {
-    t = Cvec2(0,g_hairyness);
-  }
-
-  return VertexPNX(v[0], v[1], v[2], n[0], n[1], n[2], t[0], t[1]);
-
-}
 
 // Interpret t as milliseconds
 static void updateSubdMesh(int levelSubd) {
@@ -555,6 +536,49 @@ static void updateSubdMesh(int levelSubd) {
   g_meshGeometry->reset(&verts[0], verts.size());
 }
 
+// Interpret t as milliseconds
+static void subdivideCloth(int levelSubd) {
+  Mesh m(g_mesh);
+  for (int i = 0; i < m.getNumVertices(); ++i) {
+    m.getVertex(i).setPosition(g_mesh.getVertex(i).getPosition());
+  }
+  for (int i = 0; i < levelSubd; ++i) {
+    subdivide(m);
+  }
+
+  initNormals(m);
+
+  // dynamic vertex buffer
+  vector<VertexPN> verts;
+  verts.reserve(m.getNumFaces() * 6); // conservative estimate of num of vertices
+
+  for (int i = 0; i < m.getNumFaces(); ++i) {
+    for (int j = 0; j < 3; ++j) {
+      verts.push_back(getVertexPN(m, i, j));
+    }
+    if (m.getFace(i).getNumVertices() == 4) {
+      // need another triangle to finish the face
+      for (int j = 0; j < 3; ++j) {
+        verts.push_back(getVertexPN(m, i, (2 + j) % 4));
+      }
+    }
+  }
+  g_meshGeometry->reset(&verts[0], verts.size());
+}
+
+
+/* Init cloth */
+static void initSubdMesh() {
+  g_mesh.load("cloth.mesh");
+
+  // allocate enough vertices for 7 levels of subdivision
+  g_meshGeometry.reset(new SimpleGeometryPN());
+
+  subdivideCloth(g_subdLevels);
+}
+
+
+/*
 static void initSubdMesh() {
   g_mesh.load("cube.mesh");
 
@@ -562,6 +586,7 @@ static void initSubdMesh() {
   g_meshGeometry.reset(new SimpleGeometryPN());
   updateSubdMesh(g_subdLevels);
 }
+*/
 
 // takes a projection matrix and send to the the shaders
 static void sendProjectionMatrix(Uniforms& uniforms, const Matrix4& projMatrix) {
@@ -640,7 +665,7 @@ static void drawArcBall(Uniforms& uniforms) {
 }
 
 static void drawStuff(bool picking) {
-  updateShellGeometry(); 
+//  updateShellGeometry();
   // if we are not translating, update arcball scale
   if (!(g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)))
     updateArcballScale();
@@ -742,7 +767,7 @@ static void animateTimerCallback(int ms) {
   }
   glutPostRedisplay();
 }
-
+/*
 static void bubblingTimerCallback(int dontCare) {
   if (g_bubbling) {
     updateSubdMesh(g_subdLevels);
@@ -754,6 +779,7 @@ static void bubblingTimerCallback(int dontCare) {
   }
   glutPostRedisplay();
 }
+*/
 
 static void reshape(const int w, const int h) {
   g_windowWidth = w;
@@ -1108,6 +1134,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_bubblingSpeed *= 2;
     cerr << "bubbling speed = " << g_bubblingSpeed << endl;
     break;
+    /*
   case 'b':
     if (!g_bubbling) {
       cerr << "Starts bubbling... " << endl;
@@ -1119,6 +1146,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
       g_bubbling = false;
     }
     break;
+    */
   }
 
   // Sanity check that our g_curKeyFrameNum is in sync with the g_curKeyFrame
@@ -1128,6 +1156,9 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   glutPostRedisplay();
 }
 
+/*
+ * Useful for keyboard stuff
+ *
 // new  special keyboard callback, for arrow keys
 static void specialKeyboard(const int key, const int x, const int y) {
   switch (key) {
@@ -1150,6 +1181,7 @@ static void specialKeyboard(const int key, const int x, const int y) {
   }
   glutPostRedisplay();
 }
+*/
 
 static void initGlutState(int argc, char * argv[]) {
   glutInit(&argc, argv);                                  // initialize Glut based on cmd-line args
@@ -1162,7 +1194,7 @@ static void initGlutState(int argc, char * argv[]) {
   glutMotionFunc(motion);                                 // mouse movement callback
   glutMouseFunc(mouse);                                   // mouse click callback
   glutKeyboardFunc(keyboard);
-  glutSpecialFunc(specialKeyboard);                       // special keyboard callback
+//  glutSpecialFunc(specialKeyboard);                       // special keyboard callback
 }
 
 static void initGLState() {
@@ -1204,7 +1236,6 @@ static void updateBunnyMesh() {
 
 }
 
-
 // New function that loads the bunny mesh and initializes the bunny shell meshes
 static void initBunnyMeshes() {
   g_bunnyMesh.load("bunny.mesh");
@@ -1212,11 +1243,6 @@ static void initBunnyMeshes() {
   g_bunnyGeometry.reset(new SimpleGeometryPN());
   updateBunnyMesh();
 
-  // Now allocate array of SimpleGeometryPNX to for shells, one per layer
-  g_bunnyShellGeometries.resize(g_numShells);
-  for (int i = 0; i < g_numShells; ++i) {
-    g_bunnyShellGeometries[i].reset(new SimpleGeometryPNX());
-  }
 }
 
 static void initMaterials() {
@@ -1278,13 +1304,6 @@ static void initMaterials() {
   .enable(GL_BLEND) // enable blending
   .disable(GL_CULL_FACE); // disable culling
 
-  // allocate array of materials
-  g_bunnyShellMats.resize(g_numShells);
-  for (int i = 0; i < g_numShells; ++i) {
-    g_bunnyShellMats[i].reset(new Material(bunnyShellMatPrototype)); // copy from the prototype
-    // but set a different exponent for blending transparency
-    g_bunnyShellMats[i]->getUniforms().put("uAlphaExponent", 2.f + 5.f * float(i + 1)/g_numShells);
-  }
 };
 
 static void initGeometry() {
@@ -1401,12 +1420,6 @@ static void initScene() {
   g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
                           new MyShapeNode(g_bunnyGeometry, g_bunnyMat)));
 
-  // add each shell as shape node
-  for (int i = 0; i < g_numShells; ++i) {
-    g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
-                            new MyShapeNode(g_bunnyShellGeometries[i], g_bunnyShellMats[i])));
-  }
-
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
   g_world->addChild(g_robot1Node);
@@ -1422,7 +1435,7 @@ static void initScene() {
 static void initAnimation() {
   g_animator.attachSceneGraph(g_world);
   g_curKeyFrame = g_animator.keyFramesBegin();
-  bubblingTimerCallback(0);
+  //bubblingTimerCallback(0);
 }
 
 int main(int argc, char * argv[]) {
@@ -1442,7 +1455,7 @@ int main(int argc, char * argv[]) {
     initGeometry();
     initScene();
     initAnimation();
-    initSimulation();
+//    initSimulation();
 
     glutMainLoop();
     return 0;
