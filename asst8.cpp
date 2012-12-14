@@ -147,148 +147,8 @@ static shared_ptr<SgRbtNode> g_clothNode;
 
 static shared_ptr<SgRbtNode> g_bunnyNode;
 
-// ---------- Animation
-
-class Animator {
-public:
-  typedef vector<shared_ptr<SgRbtNode> > SgRbtNodes;
-  typedef vector<RigTForm> KeyFrame;
-  typedef list<KeyFrame> KeyFrames;
-  typedef KeyFrames::iterator KeyFrameIter;
-
-private:
-  SgRbtNodes nodes_;
-  KeyFrames keyFrames_;
-
-public:
-  void attachSceneGraph(shared_ptr<SgNode> root) {
-    nodes_.clear();
-    keyFrames_.clear();
-    dumpSgRbtNodes(root, nodes_);
-  }
-
-  void loadAnimation(const char *filename) {
-    ifstream f(filename, ios::binary);
-    if (!f)
-      throw runtime_error(string("Cannot load ") + filename);
-    int numFrames, numRbtsPerFrame;
-    f >> numFrames >> numRbtsPerFrame;
-    if (numRbtsPerFrame != nodes_.size()) {
-      cerr << "Number of Rbt per frame in " << filename
-           <<" does not match number of SgRbtNodes in the current scene graph.";
-      return;
-    }
-
-    Cvec3 t;
-    Quat r;
-    keyFrames_.clear();
-    for (int i = 0; i < numFrames; ++i) {
-      keyFrames_.push_back(KeyFrame());
-      keyFrames_.back().reserve(numRbtsPerFrame);
-      for (int j = 0; j < numRbtsPerFrame; ++j) {
-        f >> t[0] >> t[1] >> t[2] >> r[0] >> r[1] >> r[2] >> r[3];
-        keyFrames_.back().push_back(RigTForm(t, r));
-      }
-    }
-  }
-
-  void saveAnimation(const char *filename) {
-    ofstream f(filename, ios::binary);
-    int numRbtsPerFrame = nodes_.size();
-    f << getNumKeyFrames() << ' ' << numRbtsPerFrame << '\n';
-    for (KeyFrames::const_iterator frameIter = keyFrames_.begin(), e = keyFrames_.end(); frameIter != e; ++frameIter) {
-      for (int j = 0; j < numRbtsPerFrame; ++j) {
-        const RigTForm& rbt = (*frameIter)[j];
-        const Cvec3& t = rbt.getTranslation();
-        const Quat& r = rbt.getRotation();
-        f << t[0] << ' ' << t[1] << ' ' << t[2] << ' '
-        << r[0] << ' ' << r[1] << ' ' << r[2] << ' ' << r[3] << '\n';
-      }
-    }
-  }
-
-  int getNumKeyFrames() const {
-    return keyFrames_.size();
-  }
-
-  int getNumRbtNodes() const {
-    return nodes_.size();
-  }
-
-  // t can be in the range [0, keyFrames_.size()-3]. Fractional amount like 1.5 is allowed.
-  void animate(double t) {
-    if (t < 0 || t > keyFrames_.size() - 3)
-      throw runtime_error("Invalid animation time parameter. Must be in the range [0, numKeyFrames - 3]");
-
-    t += 1; // interpret the key frames to be at t= -1, 0, 1, 2, ...
-    const int integralT = int(floor(t));
-    const double fraction = t - integralT;
-
-    KeyFrameIter f1 = getNthKeyFrame(integralT), f0 = f1, f2 = f1;
-    --f0;
-    ++f2;
-    KeyFrameIter f3 = f2;
-    ++f3;
-    if (f3 == keyFrames_.end()) // this might be true when t is exactly keyFrames_.size()-3.
-      f3 = f2; // in which case we step back
-
-    for (int i = 0, n = nodes_.size(); i < n; ++i) {
-      nodes_[i]->setRbt(interpolateCatmullRom((*f0)[i], (*f1)[i], (*f2)[i], (*f3)[i], fraction));
-    }
-  }
-
-  KeyFrameIter keyFramesBegin() {
-    return keyFrames_.begin();
-  }
-
-  KeyFrameIter keyFramesEnd() {
-    return keyFrames_.end();
-  }
-
-  KeyFrameIter getNthKeyFrame(int n) {
-    KeyFrameIter frameIter = keyFrames_.begin();
-    advance(frameIter, n);
-    return frameIter;
-  }
-
-  void deleteKeyFrame(KeyFrameIter keyFrameIter) {
-    keyFrames_.erase(keyFrameIter);
-  }
-
-  void pullKeyFrameFromSg(KeyFrameIter keyFrameIter) {
-    for (int i = 0, n = nodes_.size(); i < n; ++i) {
-      (*keyFrameIter)[i] = nodes_[i]->getRbt();
-    }
-  }
-
-  void pushKeyFrameToSg(KeyFrameIter keyFrameIter) {
-    for (int i = 0, n = nodes_.size(); i < n; ++i) {
-      nodes_[i]->setRbt((*keyFrameIter)[i]);
-    }
-  }
-
-  KeyFrameIter insertEmptyKeyFrameAfter(KeyFrameIter beforeFrame) {
-    if (beforeFrame != keyFrames_.end())
-      ++beforeFrame;
-
-    KeyFrameIter frameIter = keyFrames_.insert(beforeFrame, KeyFrame());
-    frameIter->resize(nodes_.size());
-    return frameIter;
-  }
-
-};
-
 static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyframes
 static int g_animateFramesPerSecond = 60; // frames to render per second during animation playback
-
-static Animator g_animator;
-static Animator::KeyFrameIter g_curKeyFrame;
-static int g_curKeyFrameNum;
-
-// these control bubbling of subdivision surface
-static bool g_bubbling = true;
-static double g_bublingTime = 0;
-static double g_bubblingSpeed = 0.01;
 
 // Global variables for used physical simulation
 static const Cvec3 g_gravity(0, -0.5, 0);  // gavity vector
@@ -422,38 +282,6 @@ static VertexPN getVertexPN(Mesh& m, const int face, const int vertex) {
   const Cvec3 n = g_smoothSubdRendering ? f.getVertex(vertex).getNormal() : f.getNormal();
   const Cvec3& v = f.getVertex(vertex).getPosition();
   return VertexPN(v[0], v[1], v[2], n[0], n[1], n[2]);
-}
-
-
-// Interpret t as milliseconds
-static void updateSubdMesh(int levelSubd) {
-  Mesh m(g_mesh);
-  for (int i = 0; i < m.getNumVertices(); ++i) {
-    m.getVertex(i).setPosition(g_mesh.getVertex(i).getPosition() * (1 + 0.7*sin(double(3 + (i%5)) * g_bublingTime)));
-  }
-  for (int i = 0; i < levelSubd; ++i) {
-    subdivide(m);
-  }
-
-  initNormals(m);
-
-  // dynamic vertex buffer
-  vector<VertexPN> verts;
-  verts.reserve(m.getNumFaces() * 6); // conservative estimate of num of vertices
-
-  for (int i = 0; i < m.getNumFaces(); ++i) {
-    for (int j = 0; j < 3; ++j) {
-      verts.push_back(getVertexPN(m, i, j));
-    }
-    if (m.getFace(i).getNumVertices() == 4) {
-      // need another triangle to finish the face
-      for (int j = 0; j < 3; ++j) {
-        verts.push_back(getVertexPN(m, i, (2 + j) % 4));
-      }
-    }
-  }
-
-  g_meshGeometry->upload(&verts[0], verts.size());
 }
 
 // takes a projection matrix and send to the the shaders
@@ -613,32 +441,6 @@ static void pick() {
   checkGlErrors();
 }
 
-bool interpolateAndDisplay(float t) {
-  if (t > g_animator.getNumKeyFrames() - 3)
-    return true;
-  g_animator.animate(t);
-  return false;
-}
-
-static void animateTimerCallback(int ms) {
-  double t = (double)ms / g_msBetweenKeyFrames;
-  bool endReached = interpolateAndDisplay(t);
-  if (g_playingAnimation && !endReached) {
-    glutTimerFunc(1000/g_animateFramesPerSecond, animateTimerCallback, ms + 1000/g_animateFramesPerSecond);
-  }
-  else {
-    cerr << "Finished playing animation" << endl;
-    g_curKeyFrame = g_animator.keyFramesEnd();
-    advance(g_curKeyFrame, -2);
-    g_animator.pushKeyFrameToSg(g_curKeyFrame);
-    g_playingAnimation = false;
-
-    g_curKeyFrameNum = g_animator.getNumKeyFrames() - 2;
-    cerr << "Now at frame [" << g_curKeyFrameNum << "]" << endl;
-  }
-  glutPostRedisplay();
-}
-
 static void reshape(const int w, const int h) {
   g_windowWidth = w;
   g_windowHeight = h;
@@ -791,21 +593,9 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     << "v\t\tCycle view\n"
     << "drag left mouse to rotate\n"
     << "a\t\tToggle display arcball\n"
-    << "w\t\tWrite animation to animation.txt\n"
-    << "i\t\tRead animation from animation.txt\n"
-    << "<space>\t\tCopy frame to scene\n"
-    << "u\t\tCopy sceneto frame\n"
-    << "n\t\tCreate new frame after current frame and copy scene to it\n"
-    << "d\t\tDelete frame\n"
-    << ">\t\tGo to next frame\n"
-    << "<\t\tGo to prev. frame\n"
-    << "y\t\tPlay/Stop animation\n"
-    << "9\t\tDecrease subdivision levels\n"
-    << "0\t\tIncrease subdivision levels\n"
-    << "b\t\tToggle subdivison surface bubbling\n"
-    << "f\t\tToggle faceted shading of subdivision surface\n"
-    << "7\t\tDecrease subdivision surface bubbling speed\n"
-    << "8\t\tIncrease subdivision surface bubbling speed\n"
+    << "space\t\tRelease cloth\n"
+    << "u\t\tUnfix 2 points on cloth\n"
+    << "w\t\tToggle cloth wireframe\n"
     << endl;
     break;
   case 's':
@@ -823,6 +613,9 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     }
   }
   break;
+  case ' ':
+    g_cloth.unfix();
+    break;
   case 'p':
     g_pickingMode = !g_pickingMode;
     cerr << "Picking mode is " << (g_pickingMode ? "on" : "off") << endl;
@@ -840,75 +633,6 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   case 'r':
     g_cloth = Cloth();
     break;
-  case 'n':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    if (g_animator.getNumKeyFrames() != 0)
-      ++ g_curKeyFrameNum;
-    g_curKeyFrame = g_animator.insertEmptyKeyFrameAfter(g_curKeyFrame);
-    g_animator.pullKeyFrameFromSg(g_curKeyFrame);
-    cerr << "Create new frame [" << g_curKeyFrameNum << "]" << endl;
-    break;
-  case ' ':
-    g_cloth.unfix();
-    break;
-  case 'd':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    if (g_curKeyFrame != g_animator.keyFramesEnd()) {
-      Animator::KeyFrameIter newCurKeyFrame = g_curKeyFrame;
-      cerr << "Deleting current frame [" << g_curKeyFrameNum << "]" << endl;;
-      if (g_curKeyFrame == g_animator.keyFramesBegin()) {
-        ++newCurKeyFrame;
-      }
-      else {
-        --newCurKeyFrame;
-        --g_curKeyFrameNum;
-      }
-      g_animator.deleteKeyFrame(g_curKeyFrame);
-      g_curKeyFrame = newCurKeyFrame;
-      if (g_curKeyFrame != g_animator.keyFramesEnd()) {
-        g_animator.pushKeyFrameToSg(g_curKeyFrame);
-        cerr << "Now at frame [" << g_curKeyFrameNum << "]" << endl;
-      }
-      else 
-        cerr << "No frames defined" << endl;
-    }
-    else {
-      cerr << "Frame list is now EMPTY" << endl;
-    }
-    break;
-  case '>':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    if (g_curKeyFrame != g_animator.keyFramesEnd()) {
-      if (++g_curKeyFrame == g_animator.keyFramesEnd())
-        --g_curKeyFrame;
-      else {
-        ++g_curKeyFrameNum;
-        g_animator.pushKeyFrameToSg(g_curKeyFrame);
-        cerr << "Stepped forward to frame [" << g_curKeyFrameNum <<"]" << endl;
-      }
-    }
-    break;
-  case '<':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    if (g_curKeyFrame != g_animator.keyFramesBegin()) {
-      --g_curKeyFrame;
-      --g_curKeyFrameNum;
-      g_animator.pushKeyFrameToSg(g_curKeyFrame);
-      cerr << "Stepped backward to frame [" << g_curKeyFrameNum << "]" << endl;
-    }
-    break;
   case 'w':
     if (g_clothWire) {
         g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -918,86 +642,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
         g_clothWire = true;
     }
     break;
-  case 'i':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    cerr << "Reading animation from animation.txt\n";
-    g_animator.loadAnimation("animation.txt");
-    g_curKeyFrame = g_animator.keyFramesBegin();
-    cerr << g_animator.getNumKeyFrames() << " frames read.\n";
-    if (g_curKeyFrame != g_animator.keyFramesEnd()) {
-      g_animator.pushKeyFrameToSg(g_curKeyFrame);
-      cerr << "Now at frame [0]" << endl;
-    }
-    g_curKeyFrameNum = 0;
-    break;
-  case '-':
-    g_msBetweenKeyFrames = min(g_msBetweenKeyFrames + 100, 10000);
-    cerr << g_msBetweenKeyFrames << " ms between keyframes.\n";
-    break;
-  case '+':
-    g_msBetweenKeyFrames = max(g_msBetweenKeyFrames - 100, 100);
-    cerr << g_msBetweenKeyFrames << " ms between keyframes.\n";
-    break;
-  case 'y':
-    if (!g_playingAnimation) {
-      if (g_animator.getNumKeyFrames() < 4) {
-        cerr << " Cannot play animation with less than 4 keyframes." << endl;
-      }
-      else {
-        g_playingAnimation = true;
-        cerr << "Playing animation... "<< endl;
-        animateTimerCallback(0);
-      }
-    }
-    else {
-      cerr << "Stopping animation... " << endl;
-      g_playingAnimation = false;
-    }
-    break;
-  case '9':
-    g_subdLevels = max(0, g_subdLevels-1);
-    cerr << "Subdivision levels = " << g_subdLevels << endl;
-    updateSubdMesh(g_subdLevels);
-    break;
-  case '0':
-    g_subdLevels = min(7, g_subdLevels+1);
-    cerr << "Subdivision levels = " << g_subdLevels << endl;
-    updateSubdMesh(g_subdLevels);
-    break;
-  case 'f':
-    g_smoothSubdRendering = !g_smoothSubdRendering;
-    updateSubdMesh(g_subdLevels);
-    break;
-  case '7':
-    g_bubblingSpeed *= 0.5;
-    cerr << "bubbling speed = " << g_bubblingSpeed << endl;
-    break;
-  case '8':
-    g_bubblingSpeed *= 2;
-    cerr << "bubbling speed = " << g_bubblingSpeed << endl;
-    break;
- 
-    /*
-  case 'b':
-    if (!g_bubbling) {
-      cerr << "Starts bubbling... " << endl;
-      g_bubbling = true;
-      bubblingTimerCallback(0);
-    }
-    else {
-      cerr << " Stops bubbling... " << endl;
-      g_bubbling = false;
-    }
-    break;
-    */
   }
-
-  // Sanity check that our g_curKeyFrameNum is in sync with the g_curKeyFrame
-  if (g_animator.getNumKeyFrames() > 0)
-    assert(g_animator.getNthKeyFrame(g_curKeyFrameNum) == g_curKeyFrame);
 
   glutPostRedisplay();
 }
@@ -1171,10 +816,6 @@ static void initScene() {
 }
 
 static void initAnimation() {
-  g_animator.attachSceneGraph(g_world);
-  g_curKeyFrame = g_animator.keyFramesBegin();
-
-
   animateCloth(0);
 }
 
