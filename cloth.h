@@ -12,45 +12,46 @@ class Cloth
     int height;
     int width;
     int ballWidth;
-	int ballHeight;
+    int ballHeight;
     int numBalls;
     int numVertices;
 
-	std::vector<Ball> balls;
-	std::vector<Spring> springs;
+    std::vector<Ball> balls;
+    std::vector<Spring> springs;
 
-	std::vector<VertexPN> vertices;
+    std::vector<VertexPN> vertices;
 
-  void newSpring(Ball *ball1, Ball *ball2) {
-    springs.push_back(Spring(ball1,ball2));
-  }
+    void newSpring(Ball *ball1, Ball *ball2) {
+        springs.push_back(Spring(ball1,ball2));
+    }
+
     Ball* getBallAt (int x, int y) {
-    return &balls[y * ballWidth + x];
-  }
+        return &balls[y * ballWidth + x];
+    }
 
-  void updateVertices() {
-    updateNormals();
+    void updateVertices() {
+        updateNormals();
 
-    std::vector<VertexPN>::iterator it = vertices.begin();
+        std::vector<VertexPN>::iterator it = vertices.begin();
 
-    for(int i = 0; i < ballWidth -1 ; i++) {
-        for(int j = 0; j < ballHeight-1; j++)
-        {
-            *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
-            ++it;
-            *it = VertexPN(getBallAt(i,j)->getPos(), getBallAt(i,j)->getNormal().normalize());
-            ++it;
-            *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
-            ++it;
-            *it = VertexPN(getBallAt(i+1,j+1)->getPos(), getBallAt(i+1,j+1)->getNormal().normalize());
-            ++it;
-            *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
-            ++it;
-            *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
-            ++it;
+        for(int i = 0; i < ballWidth -1 ; i++) {
+            for(int j = 0; j < ballHeight-1; j++)
+            {
+                *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
+                ++it;
+                *it = VertexPN(getBallAt(i,j)->getPos(), getBallAt(i,j)->getNormal().normalize());
+                ++it;
+                *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
+                ++it;
+                *it = VertexPN(getBallAt(i+1,j+1)->getPos(), getBallAt(i+1,j+1)->getNormal().normalize());
+                ++it;
+                *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
+                ++it;
+                *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
+                ++it;
+            }
         }
     }
-  }
 
   void updateNormals() {
     for (int i = 0; i < ballWidth; ++i) {
@@ -92,21 +93,21 @@ public:
         numBalls = bw*bh;
         numVertices = numBalls * 6;
 
-		balls.resize(numBalls);
-		vertices.resize(numVertices * 6);
+        balls.resize(numBalls);
+        vertices.resize(numVertices * 6);
 
     for (int x = 0; x < ballWidth; ++x)
-		  for (int y=0; y < ballHeight; ++y)
+        for (int y=0; y < ballHeight; ++y)
       {
-			  float pos2;
+            float pos2;
         if (x == 0 || x == ballWidth-1 || y == 0 || y == ballHeight-1)
           pos2 = height / (float)ballHeight / 2;
         else
           pos2 = 0;
         Cvec3 position = Cvec3(width * (x / (float)ballWidth),pos2,height * (y / (float)ballHeight));
-			  balls[y * ballWidth + x] = Ball(position+Cvec3(0,4,0));
+            balls[y * ballWidth + x] = Ball(position+Cvec3(0,4,0));
         balls[y * ballWidth + x].setAccel(Cvec3(0.,-0.1,0.));
-		  }
+      }
 
     for(int i = 0; i < ballWidth; i++)
 			for(int j = 0; j < ballHeight; j++)
@@ -163,22 +164,15 @@ public:
 	{
    for (int i = 0, n = balls.size(); i < n; i++)
 	  {
-           float bufferedRadius = radius + .05;
-//          center = balls[50].getPos() - Cvec3(0.0,-1.0,0.0);
+          float bufferedRadius = radius + .05;
 		  Cvec3 toCenter = balls[i].getPos() - center;
-//          if (i == 50) {
-//            std::cout << toCenter[0] << " " << toCenter[1] << " " << toCenter[2] << "\n";
-//            flush(std::cout);
-//          }
+
 		  float l = toCenter.length();
 
 		  if (l < bufferedRadius) {
-            std::cout << "ow! " << i << "\n";
-            flush(std::cout);
             balls[i].movePos(toCenter.normalize() * (bufferedRadius-l));
           }
 	  }
-
         updateVertices();
 	}
 
@@ -190,7 +184,6 @@ public:
 
 		for (int i = 0, n = balls.size(); i < n; i++)
 			balls[i].timeStep();
-
 	}
 
 	void addForce(Cvec3 f)
@@ -202,4 +195,4 @@ public:
 	}
 };
 
-#endif	//cloth_h
+#endif

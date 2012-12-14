@@ -643,6 +643,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   }
 
   glutPostRedisplay();
+
 }
 
 static void initGlutState(int argc, char * argv[]) {
@@ -664,8 +665,8 @@ static void initGLState() {
   glClearDepth(0.);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-  glCullFace(GL_BACK);
-  glEnable(GL_CULL_FACE);
+//  glCullFace(GL_BACK);
+//  glEnable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_GREATER);
   glReadBuffer(GL_BACK);
@@ -821,8 +822,8 @@ int main(int argc, char * argv[]) {
     initGeometry();
     initScene();
     initAnimation();
-
     glutMainLoop();
+
     return 0;
   }
   catch (const runtime_error& e) {
