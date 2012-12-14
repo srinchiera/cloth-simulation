@@ -533,7 +533,9 @@ static void drawArcBall(Uniforms& uniforms) {
 }
 
 static void drawStuff(bool picking) {
-//  updateShellGeometry();
+  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
+  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
+
   // if we are not translating, update arcball scale
   if (!(g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)))
     updateArcballScale();
@@ -581,7 +583,7 @@ static void drawStuff(bool picking) {
 static void display() {
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-animateCloth(0);
+
 
   drawStuff(false);
 
