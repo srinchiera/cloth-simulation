@@ -40,6 +40,9 @@
 #include "drawer.h"
 #include "picker.h"
 #include "mesh.h"
+#include "spring.h"
+#include "ball.h"
+#include "cloth.h"
 
 using namespace std;
 using namespace tr1;
@@ -113,10 +116,14 @@ typedef SgGeometryShapeNode MyShapeNode;
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
 static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
+static shared_ptr<Geometry> g_sphere2;
+static shared_ptr<SimpleGeometryPN> g_clothGeometry;
+
 static shared_ptr<SimpleGeometryPN> g_meshGeometry;
 static Mesh g_mesh;
-// cloth mesh global varaible
-static Mesh g_clothMesh;
+
+//static shared_ptr<SimpleGeometryPN> g_clothGeometry;
+static Cloth g_cloth;
 
 static int g_subdLevels = 0;
 
@@ -126,12 +133,14 @@ static Mesh g_bunnyMesh;
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
-static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node, g_light1, g_light2, g_meshNode;
-// Node for the cloth
-static shared_ptr<SgRbtNode> g_clothMeshNode;
-
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node, g_light1, g_light2;
 static shared_ptr<SgRbtNode> g_currentCameraNode;
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
+static shared_ptr<SgRbtNode> g_sphere2Node;
+static shared_ptr<SgRbtNode> g_clothNode;
+
+//static shared_ptr<SgRbtNode> g_clothNode;
+
 
 static shared_ptr<SgRbtNode> g_bunnyNode;
 
@@ -286,130 +295,11 @@ static double g_damping = 0.96;
 static double g_stiffness = 10;
 static int g_simulationsPerSecond = 60;
 
-static std::vector<Cvec3> g_tipPos,        // should be hair tip pos in world-space coordinates
-                          g_tipVelocity;   // should be hair tip velocity in world-space coordinates
-
-
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
 
-static VertexPN getVertexPN(Mesh& m, const int face, const int vertex); 
+static VertexPN getVertexPN(Mesh& m, const int face, const int vertex);
 static VertexPNX getFurVertexPNX(Mesh& m, const int face, const int vertex, int shellNum);
-
-/*
-// Specifying shell geometries based on g_tipPos, g_furHeight, and g_numShells.
-// You need to call this function whenver the shell needs to be updated
-static void updateShellGeometry() {
-    Mesh m(g_bunnyMesh);
-
-    // dynamic vertex buffer
-    vector<VertexPNX> verts;
-    verts.reserve(m.getNumFaces() * 6); // conservative estimate of num of vertices
-    Cvec2 texture;
-    RigTForm bunny = getPathAccumRbt(g_world, g_bunnyNode, 0);
-
-    for (int i = 0; i < g_numShells; i++) 
-    {
-        verts.clear(); 
-        for (int j = 0, l = m.getNumFaces(); j < l; j++) 
-        {
-          for (int k = 0; k < 3; k++) 
-          {
-            if (k == 0)
-              texture = Cvec2(0, 0);
-            else if (k == 1)
-              texture = Cvec2(0, g_hairyness);
-            else
-              texture = Cvec2(g_hairyness, 0);
-
-            Cvec3 p = g_bunnyMesh.getFace(j).getVertex(k).getPosition();
-            Cvec3 normal = g_bunnyMesh.getFace(j).getVertex(k).getNormal();
-            Cvec3 t = g_tipPos[g_bunnyMesh.getFace(j).getVertex(k).getIndex()];
-            Cvec3 s = p + (normal * g_furHeight);
-
-            Cvec3 n = normal * (g_furHeight / g_numShells);
-
-            t = Cvec3(inv(bunny) * Cvec4(t, 1));
-
-            Cvec3 d = (t - p - (normal * g_furHeight)) / ((g_numShells - 1) * g_numShells / 2);
-            Cvec3 pos;
-            if (i == 0)
-                pos = p;
-            else
-                pos = p + n * (i) + d * ((i-1) * (i) / 2);
-
-            verts.push_back(VertexPNX(pos, n + (d * ((i-1) * (i) / 2)) * i, texture));
-          }
-        }
-
-        g_bunnyShellGeometries[i]->reset(&verts[0], verts.size());
-
-    }
-  
-  // TASK 1 and 3 TODO: finish this function as part of Task 1 and Task 3
-}
-*/
-
-/*
- *
- * Hair Simulation Callback
- *
- *
-// New glut timer call back that perform dynamics simulation
-// every g_simulationsPerSecond times per second
-static void hairsSimulationCallback(int dontCare) {
-  RigTForm bunny = getPathAccumRbt(g_world, g_bunnyNode, 0);
-  for (int i = 0; i < g_numStepsPerFrame; i++) 
-  {
-    for (int j = 0, m = g_bunnyMesh.getNumVertices(); j < m; j++) 
-    {
-      Cvec3 p = g_bunnyMesh.getVertex(j).getPosition();
-      Cvec3 t = g_tipPos[j];
-      Cvec3 n = g_bunnyMesh.getVertex(j).getNormal();
-      Cvec3 s = p + (n * g_furHeight);
-      Cvec3 v = g_tipVelocity[j];
-
-      s = Cvec3(bunny * Cvec4(s, 1));
-      p = Cvec3(bunny * Cvec4(p, 1));
-
-      Cvec3 springForce = (s - t) * g_stiffness;
-
-      Cvec3 force = g_gravity + springForce;
-
-      t = t + v * g_timeStep;
-
-      if (norm(t - p) != 0) 
-        t = p + (t - p) / norm(t - p) * g_furHeight;
-      g_tipVelocity[j] = (v + force * g_timeStep) * g_damping;
-      g_tipPos[j] = t;
-    }
-  }
-  // schedule this to get called again
-  glutTimerFunc(1000/g_simulationsPerSecond, hairsSimulationCallback, 0);
-  glutPostRedisplay(); // signal redisplaying
-}
-*/
-
-/*
-static void initSimulation() {
-  g_tipPos.resize(g_bunnyMesh.getNumVertices(), Cvec3(0));
-
-  Mesh m(g_bunnyMesh);
-
-  // TASK 1 TODO: initialize g_tipPos to "at-rest" hair tips in world coordinates
-  for (int i = 0; i < m.getNumFaces(); ++i) {
-    for (int j = 0; j < 3; ++j) {
-      g_tipPos.push_back((m.getFace(i).getVertex(j).getPosition()) + (m.getFace(i).getVertex(j).getNormal() * g_furHeight));
-    }
-    if (m.getFace(i).getNumVertices() == 4) {
-      // need another triangle to finish the face
-      for (int j = 0; j < 3; ++j) {
-        g_tipPos.push_back((m.getFace(i).getVertex(j).getPosition()) + (m.getFace(i).getVertex(j).getNormal() * g_furHeight));
-      }
-    }
-  }
-}
-*/
 
 static void initGround() {
   int ibLen, vbLen;
@@ -435,6 +325,14 @@ static void initCubes() {
   g_cube.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vbLen, ibLen));
 }
 
+static void initCloth() {
+  int vbLen = 45*45;
+  // Temporary storage for cube Geometry
+  vector<VertexPN> vtx(vbLen);
+
+  g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), vbLen));
+}
+
 static void initSphere() {
   int ibLen, vbLen;
   getSphereVbIbLen(20, 10, vbLen, ibLen);
@@ -444,6 +342,17 @@ static void initSphere() {
   vector<unsigned short> idx(ibLen);
   makeSphere(1, 20, 10, vtx.begin(), idx.begin());
   g_sphere.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
+}
+
+static void initSphere2() {
+  int ibLen, vbLen;
+  getSphereVbIbLen(20, 10, vbLen, ibLen);
+
+  // Temporary storage for sphere Geometry
+  vector<VertexPNTBX> vtx(vbLen);
+  vector<unsigned short> idx(ibLen);
+  makeSphere(1, 20, 10, vtx.begin(), idx.begin());
+  g_sphere2.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
 }
 
 static void initRobots() {
@@ -535,58 +444,6 @@ static void updateSubdMesh(int levelSubd) {
 
   g_meshGeometry->reset(&verts[0], verts.size());
 }
-
-// Interpret t as milliseconds
-static void subdivideCloth(int levelSubd) {
-  Mesh m(g_mesh);
-  for (int i = 0; i < m.getNumVertices(); ++i) {
-    m.getVertex(i).setPosition(g_mesh.getVertex(i).getPosition());
-  }
-  for (int i = 0; i < levelSubd; ++i) {
-    subdivide(m);
-  }
-
-  initNormals(m);
-
-  // dynamic vertex buffer
-  vector<VertexPN> verts;
-  verts.reserve(m.getNumFaces() * 6); // conservative estimate of num of vertices
-
-  for (int i = 0; i < m.getNumFaces(); ++i) {
-    for (int j = 0; j < 3; ++j) {
-      verts.push_back(getVertexPN(m, i, j));
-    }
-    if (m.getFace(i).getNumVertices() == 4) {
-      // need another triangle to finish the face
-      for (int j = 0; j < 3; ++j) {
-        verts.push_back(getVertexPN(m, i, (2 + j) % 4));
-      }
-    }
-  }
-  g_meshGeometry->reset(&verts[0], verts.size());
-}
-
-
-/* Init cloth */
-static void initSubdMesh() {
-  g_mesh.load("cloth.mesh");
-
-  // allocate enough vertices for 7 levels of subdivision
-  g_meshGeometry.reset(new SimpleGeometryPN());
-
-  subdivideCloth(g_subdLevels);
-}
-
-
-/*
-static void initSubdMesh() {
-  g_mesh.load("cube.mesh");
-
-  // allocate enough vertices for 7 levels of subdivision
-  g_meshGeometry.reset(new SimpleGeometryPN());
-  updateSubdMesh(g_subdLevels);
-}
-*/
 
 // takes a projection matrix and send to the the shaders
 static void sendProjectionMatrix(Uniforms& uniforms, const Matrix4& projMatrix) {
@@ -767,19 +624,6 @@ static void animateTimerCallback(int ms) {
   }
   glutPostRedisplay();
 }
-/*
-static void bubblingTimerCallback(int dontCare) {
-  if (g_bubbling) {
-    updateSubdMesh(g_subdLevels);
-    g_bublingTime += g_bubblingSpeed;
-    glutTimerFunc(1000/g_animateFramesPerSecond, bubblingTimerCallback, 0);
-  }
-  else {
-    cerr << "Bubbling stopped" << endl;
-  }
-  glutPostRedisplay();
-}
-*/
 
 static void reshape(const int w, const int h) {
   g_windowWidth = w;
@@ -1156,33 +1000,6 @@ static void keyboard(const unsigned char key, const int x, const int y) {
   glutPostRedisplay();
 }
 
-/*
- * Useful for keyboard stuff
- *
-// new  special keyboard callback, for arrow keys
-static void specialKeyboard(const int key, const int x, const int y) {
-  switch (key) {
-  case GLUT_KEY_RIGHT:
-    g_furHeight *= 1.05;
-    cerr << "fur height = " << g_furHeight << std::endl;
-    break;
-  case GLUT_KEY_LEFT:
-    g_furHeight /= 1.05;
-    std::cerr << "fur height = " << g_furHeight << std::endl;
-    break;
-  case GLUT_KEY_UP:
-    g_hairyness *= 1.05;
-    cerr << "hairyness = " << g_hairyness << std::endl;
-    break;
-  case GLUT_KEY_DOWN:
-    g_hairyness /= 1.05;
-    cerr << "hairyness = " << g_hairyness << std::endl;
-    break;
-  }
-  glutPostRedisplay();
-}
-*/
-
 static void initGlutState(int argc, char * argv[]) {
   glutInit(&argc, argv);                                  // initialize Glut based on cmd-line args
   glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);  // RGBA pixel channels and double buffering
@@ -1303,16 +1120,18 @@ static void initMaterials() {
   .blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) // set blending mode
   .enable(GL_BLEND) // enable blending
   .disable(GL_CULL_FACE); // disable culling
-
 };
 
 static void initGeometry() {
   initGround();
-  initCubes();
+//  initCloth();
   initSphere();
   initRobots();
-  initSubdMesh();
   initBunnyMeshes();
+  initCubes();
+
+  initSphere2();
+  initCloth();
 }
 
 static void constructRobot(shared_ptr<SgTransformNode> base, shared_ptr<Material> material) {
@@ -1398,6 +1217,7 @@ static void initScene() {
   g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-8, 1, 0))));
   g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(8, 1, 0))));
 
+
   constructRobot(g_robot1Node, g_redDiffuseMat); // a Red robot
   constructRobot(g_robot2Node, g_blueDiffuseMat); // a Blue robot
 
@@ -1409,16 +1229,20 @@ static void initScene() {
   g_light2->addChild(shared_ptr<MyShapeNode>(
                        new MyShapeNode(g_sphere, g_lightMat, Cvec3(0), Cvec3(0), Cvec3(0.5))));
 
-  g_meshNode.reset(new SgRbtNode(RigTForm(Cvec3(4, -3, 4))));
-  g_meshNode->addChild(shared_ptr<MyShapeNode>(
-                         new MyShapeNode(g_meshGeometry, g_shinyMat, Cvec3(0), Cvec3(0), Cvec3(2, 2, 2))));
-
   // create a single transform node for both the bunny and the bunny shells
-  g_bunnyNode.reset(new SgRbtNode());
+  g_bunnyNode.reset(new SgRbtNode(Cvec3(-3.0,0.0,-4.0)));
 
   // add bunny as a shape nodes
   g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
                           new MyShapeNode(g_bunnyGeometry, g_bunnyMat)));
+
+  g_sphere2Node.reset(new SgRbtNode());
+  g_sphere2Node->addChild(shared_ptr<MyShapeNode>(
+                          new MyShapeNode(g_sphere2, g_bunnyMat)));
+
+  g_clothNode.reset(new SgRbtNode());
+  g_clothNode->addChild(shared_ptr<MyShapeNode>(
+                          new MyShapeNode(g_clothGeometry, g_lightMat)));
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
@@ -1426,8 +1250,11 @@ static void initScene() {
   g_world->addChild(g_robot2Node);
   g_world->addChild(g_light1);
   g_world->addChild(g_light2);
-  g_world->addChild(g_meshNode);
   g_world->addChild(g_bunnyNode);
+
+//  g_world->addChild(g_clothNode);
+  g_world->addChild(g_sphere2Node);
+  g_world->addChild(g_clothNode);
 
   g_currentCameraNode = g_skyNode;
 }

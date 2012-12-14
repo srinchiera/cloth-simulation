@@ -121,9 +121,22 @@ public:
 
   // Normalize self and returns self
   Cvec& normalize() {
-    assert(dot(*this, *this) > CS175_EPS2);
-    return *this /= std::sqrt(dot(*this, *this));
+    double divide;
+    //assert(dot(*this, *this) > CS175_EPS2);
+//    if (dot(*this, *this) == 0) {
+//        divide = 1;
+//    } else {
+        divide = std::sqrt(dot(*this, *this));
+
+//    }
+    return *this /= divide;
   }
+
+  //return length of self
+  double length() {
+    return (double) sqrt((*this)[0]*(*this)[0] + (*this)[1]*(*this)[1] + (*this)[2]*(*this)[2]);
+  }
+
 };
 
 template<typename T>

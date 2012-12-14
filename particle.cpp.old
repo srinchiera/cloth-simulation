@@ -1,0 +1,8 @@
+#include "particle.h"
+
+// Constructors
+Particle::Particle(Cvec3 position, Cvec3 acceleration)
+ : position(position), velocity(Cvec3(0)), acceleration(acceleration), totalForces(Cvec3(0)), normal(Cvec3(0)), damping(0.4), inverseMass(1), stationary(false)
+{
+}
+
