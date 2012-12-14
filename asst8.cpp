@@ -189,11 +189,9 @@ static void initCubes() {
 }
 
 static void initCloth() {
-  int vbLen = 45*45*6;
-  // Temporary storage for cube Geometry
-  vector<VertexPN> vtx(vbLen);
+  g_cloth.loadDimensions(5,5,45,45);
 
-  g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), vbLen));
+  g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size()));
 }
 
 static void animateCloth(int dontCare) {
@@ -714,14 +712,6 @@ static void initMaterials() {
   Material diffuse("./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader");
   Material solid("./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader");
 
-  // copy diffuse prototype and set red color
-  g_redDiffuseMat.reset(new Material(diffuse));
-  g_redDiffuseMat->getUniforms().put("uColor", Cvec3f(1, 0, 0));
-
-  // copy diffuse prototype and set blue color
-  g_blueDiffuseMat.reset(new Material(diffuse));
-  g_blueDiffuseMat->getUniforms().put("uColor", Cvec3f(0, 0, 1));
-
   // normal mapping
   g_bumpFloorMat.reset(new Material("./shaders/normal-gl3.vshader", "./shaders/normal-gl3.fshader"));
   g_bumpFloorMat->getUniforms().put("uTexColor", shared_ptr<ImageTexture>(new ImageTexture("Fieldstone.ppm", true)));
@@ -749,14 +739,10 @@ static void initMaterials() {
   .put("uColorAmbient", Cvec3f(0.45f, 0.3f, 0.3f))
   .put("uColorDiffuse", Cvec3f(0.2f, 0.2f, 0.2f));
 
-  // bunny shell materials;
-  shared_ptr<ImageTexture> shellTexture(new ImageTexture("shell.ppm", false)); // common shell texture
-
   // copy solid prototype, and set to wireframed rendering
   g_clothMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader"));
   g_clothMat->getUniforms().put("uColor", Cvec3f(102./255., 0./255., 153./255.));
   g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
-//  g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 };
 
@@ -808,7 +794,6 @@ static void initScene() {
   g_world->addChild(g_light2);
   g_world->addChild(g_bunnyNode);
 
-//  g_world->addChild(g_clothNode);
   g_world->addChild(g_sphere2Node);
   g_world->addChild(g_clothNode);
 
@@ -836,7 +821,6 @@ int main(int argc, char * argv[]) {
     initGeometry();
     initScene();
     initAnimation();
-//    initSimulation();
 
     glutMainLoop();
     return 0;

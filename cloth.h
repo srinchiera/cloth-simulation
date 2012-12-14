@@ -9,8 +9,12 @@ static const int ITERATIONS = 15;
 
 class Cloth
 {
+    int height;
+    int width;
     int ballWidth;
 	int ballHeight;
+    int numBalls;
+    int numVertices;
 
 	std::vector<Ball> balls;
 	std::vector<Spring> springs;
@@ -74,16 +78,22 @@ class Cloth
     }
 
 public:
-//	Cloth (float width, float height, int ballWidth, int ballHeight) : ballWidth(ballWidth), ballHeight(ballHeight)
-	Cloth ()
-	{
-        int width = 5;
-        int height = 5;
-        ballWidth = 45;
-        ballHeight = 45;
+  Cloth () {}
 
-		balls.resize(ballWidth * ballHeight);
-		vertices.resize(ballWidth * ballHeight * 6);
+  std::vector<VertexPN> getVertices() {
+    return vertices;
+  }
+  void loadDimensions(int w, int h, int bw, int bh) {
+        width = w;
+        height = h;
+        ballWidth = bw;
+        ballHeight = bh;
+
+        numBalls = bw*bh;
+        numVertices = numBalls * 6;
+
+		balls.resize(numBalls);
+		vertices.resize(numVertices * 6);
 
     for (int x = 0; x < ballWidth; ++x)
 		  for (int y=0; y < ballHeight; ++y)
@@ -130,10 +140,8 @@ public:
     getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
 
     updateVertices();
-	}
 
-  std::vector<VertexPN> getVertices() {
-    return vertices;
+
   }
 
   void unfix()
