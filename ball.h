@@ -13,7 +13,7 @@ class Ball
   Cvec3 accel; //accel
 	Cvec3 pos; //current position
 	Cvec3 prevPos; //old position
-	Cvec3 normal; // an accumulated normal (i.e. non normalized), used for OpenGL soft shading
+	Cvec3 normal; // normal
   bool canMove;
 
 public:
@@ -55,9 +55,12 @@ public:
   }
 
 	void movePos(const Cvec3 v) {
-    if(canMove) {
-      pos += v;
+        if(canMove) {
+          pos += v;
+        }
     }
+	void setPos(const Cvec3 v) {
+      pos = v;
   }
 
 	void fixMovement() {
@@ -68,11 +71,11 @@ public:
     canMove = true;
   }
 
-	void addNormal (Cvec3 normal) {
-		normal += normal.normalize();
+	void addNormal (Cvec3 normalVec) {
+		normal += normalVec.normalize();
 	}
 
-	Cvec3& getNormal() {
+    Cvec3& getNormal() {
     return normal;
   }
 };

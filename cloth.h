@@ -56,14 +56,14 @@ class Cloth
             Cvec3 normal;
 
             normal = triNorm(getBallAt(i+1,j), getBallAt(i,j),getBallAt(i,j+1));
-            getBallAt(i+1,j)->setNormal(normal);
-            getBallAt(i,j)->setNormal(normal);
-            getBallAt(i,j+1)->setNormal(normal);
+            getBallAt(i+1,j)->addNormal(normal);
+            getBallAt(i,j)->addNormal(normal);
+            getBallAt(i,j+1)->addNormal(normal);
 
             normal = triNorm(getBallAt(i+1,j+1), getBallAt(i+1,j),getBallAt(i,j+1));
-            getBallAt(i+1,j+1)->setNormal(normal);
-            getBallAt(i+1,j)->setNormal(normal);
-            getBallAt(i,j+1)->setNormal(normal);
+            getBallAt(i+1,j+1)->addNormal(normal);
+            getBallAt(i+1,j)->addNormal(normal);
+            getBallAt(i,j+1)->addNormal(normal);
         }
     }
 
@@ -128,13 +128,9 @@ public:
 
     getBallAt(0,0)->fixMovement();
     getBallAt(ballWidth-1,0)->fixMovement();
-    getBallAt(0,ballHeight-1)->fixMovement();
-    getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
-/*
-    double g_time = .25;
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-*/
+//    getBallAt(0,ballHeight-1)->fixMovement();
+//    getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
+
     updateVertices();
 	}
 
@@ -154,6 +150,8 @@ public:
 	{
    for (int i = 0, n = balls.size(); i < n; i++)
 	  {
+           float bufferedRadius = radius + .05;
+//          center = balls[50].getPos() - Cvec3(0.0,-1.0,0.0);
 		  Cvec3 toCenter = balls[i].getPos() - center;
 //          if (i == 50) {
 //            std::cout << toCenter[0] << " " << toCenter[1] << " " << toCenter[2] << "\n";
@@ -161,13 +159,14 @@ public:
 //          }
 		  float l = toCenter.length();
 
-		  if (l < radius) {
-            std::cout << "ow! " << (radius-l) << "\n";
+		  if (l < bufferedRadius) {
+            std::cout << "ow! " << i << "\n";
             flush(std::cout);
-//			balls[i].movePos(toCenter.normalize() * (radius-l));
-            balls[i].movePos(toCenter.normalize() * (radius-l));
+            balls[i].movePos(toCenter.normalize() * (bufferedRadius-l));
           }
 	  }
+
+        updateVertices();
 	}
 
 	void timeStep()
@@ -178,13 +177,15 @@ public:
 
 		for (int i = 0, n = balls.size(); i < n; i++)
 			balls[i].timeStep();
-        updateVertices();
+
 	}
 
 	void addForce(Cvec3 f)
 	{
-		for (int i = 0, n = balls.size(); i < n; i++)
+		for (int i = 0, n = balls.size(); i < n; i++) {
 			balls[i].newForce(f);
+            balls[i].resetNormal();
+        }
 	}
 };
 

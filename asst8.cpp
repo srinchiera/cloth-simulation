@@ -119,6 +119,7 @@ static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 static shared_ptr<Geometry> g_sphere2;
 static shared_ptr<SimpleGeometryPN> g_clothGeometry;
 static Cloth g_cloth;
+static Cvec3 clothTranslation = Cvec3(-2.5,-.5,-2.5);
 
 static shared_ptr<SimpleGeometryPN> g_meshGeometry;
 static Mesh g_mesh;
@@ -336,13 +337,12 @@ static void animateCloth(int dontCare) {
   int vbLen = 45*45*6;
   g_cloth.addForce(Cvec3(0,-0.2,0)*.25);
   g_cloth.timeStep();
-  g_cloth.collision(Cvec3(0,0,0),1);
+  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
 
   g_clothGeometry->upload(&(g_cloth.getVertices()[0]), vbLen);
   glutTimerFunc(1000/g_animateFramesPerSecond, animateCloth, 0);
   glutPostRedisplay();
 }
-
 
 static void initSphere() {
   int ibLen, vbLen;
@@ -581,6 +581,7 @@ static void drawStuff(bool picking) {
 static void display() {
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+animateCloth(0);
 
   drawStuff(false);
 
@@ -832,19 +833,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_displayArcball = !g_displayArcball;
     break;
   case 'u':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
 
-    if (g_curKeyFrame == g_animator.keyFramesEnd()) { // only possible when frame list is empty
-      cerr << "Create new frame [0]."  << endl;
-      g_curKeyFrame = g_animator.insertEmptyKeyFrameAfter(g_animator.keyFramesBegin());
-      g_curKeyFrameNum = 0;
-    }
-    cerr << "Copying scene graph to current frame [" << g_curKeyFrameNum << "]" << endl;
-    g_animator.pullKeyFrameFromSg(g_curKeyFrame);
-    break;
   case 'n':
     if (g_playingAnimation) {
       cerr << "Cannot operate when playing animation" << endl;
@@ -1243,7 +1232,7 @@ static void initScene() {
 
   g_clothNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
   g_clothNode->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_clothGeometry, g_shinyMat, Cvec3(-2.5,-.5,-2.5))));
+                          new MyShapeNode(g_clothGeometry, g_shinyMat, clothTranslation)));
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
