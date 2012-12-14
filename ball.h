@@ -2,6 +2,7 @@
 #define BALL_H
 
 #include "cvec.h"
+#include <iostream>
 
 static const double AIR_RESISTANCE = 0.05;
 static const double TIME = 0.25;
@@ -54,8 +55,9 @@ public:
   }
 
 	void movePos(const Cvec3 v) {
-    if(canMove)
+    if(canMove) {
       pos += v;
+    }
   }
 
 	void fixMovement() {

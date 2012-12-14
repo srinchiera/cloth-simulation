@@ -118,12 +118,10 @@ typedef SgGeometryShapeNode MyShapeNode;
 static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 static shared_ptr<Geometry> g_sphere2;
 static shared_ptr<SimpleGeometryPN> g_clothGeometry;
+static Cloth g_cloth;
 
 static shared_ptr<SimpleGeometryPN> g_meshGeometry;
 static Mesh g_mesh;
-
-//static shared_ptr<SimpleGeometryPN> g_clothGeometry;
-static Cloth g_cloth;
 
 static int g_subdLevels = 0;
 
@@ -326,12 +324,25 @@ static void initCubes() {
 }
 
 static void initCloth() {
-  int vbLen = 45*45;
+  int vbLen = 45*45*6;
   // Temporary storage for cube Geometry
   vector<VertexPN> vtx(vbLen);
 
   g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), vbLen));
 }
+
+static void animateCloth(int dontCare) {
+
+  int vbLen = 45*45*6;
+  g_cloth.addForce(Cvec3(0,-0.2,0)*.25);
+  g_cloth.timeStep();
+  g_cloth.collision(Cvec3(0,0,0),1);
+
+  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), vbLen);
+  glutTimerFunc(1000/g_animateFramesPerSecond, animateCloth, 0);
+  glutPostRedisplay();
+}
+
 
 static void initSphere() {
   int ibLen, vbLen;
@@ -442,7 +453,7 @@ static void updateSubdMesh(int levelSubd) {
     }
   }
 
-  g_meshGeometry->reset(&verts[0], verts.size());
+  g_meshGeometry->upload(&verts[0], verts.size());
 }
 
 // takes a projection matrix and send to the the shaders
@@ -846,17 +857,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     cerr << "Create new frame [" << g_curKeyFrameNum << "]" << endl;
     break;
   case ' ':
-    if (g_playingAnimation) {
-      cerr << "Cannot operate when playing animation" << endl;
-      break;
-    }
-    if (g_curKeyFrame != g_animator.keyFramesEnd()) {
-      cerr << "Loading current key frame [" << g_curKeyFrameNum << "] to scene graph" << endl;
-      g_animator.pushKeyFrameToSg(g_curKeyFrame);
-    }
-    else {
-      cerr << "No key frame defined" << endl;
-    }
+    g_cloth.unfix();
     break;
   case 'd':
     if (g_playingAnimation) {
@@ -978,6 +979,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_bubblingSpeed *= 2;
     cerr << "bubbling speed = " << g_bubblingSpeed << endl;
     break;
+ 
     /*
   case 'b':
     if (!g_bubbling) {
@@ -1049,7 +1051,7 @@ static void updateBunnyMesh() {
     }
   }
 
-  g_bunnyGeometry->reset(&verts[0], verts.size());
+  g_bunnyGeometry->upload(&verts[0], verts.size());
 
 }
 
@@ -1124,7 +1126,6 @@ static void initMaterials() {
 
 static void initGeometry() {
   initGround();
-//  initCloth();
   initSphere();
   initRobots();
   initBunnyMeshes();
@@ -1240,9 +1241,9 @@ static void initScene() {
   g_sphere2Node->addChild(shared_ptr<MyShapeNode>(
                           new MyShapeNode(g_sphere2, g_bunnyMat)));
 
-  g_clothNode.reset(new SgRbtNode());
+  g_clothNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
   g_clothNode->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_clothGeometry, g_lightMat)));
+                          new MyShapeNode(g_clothGeometry, g_shinyMat, Cvec3(-2.5,-.5,-2.5))));
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
@@ -1262,7 +1263,9 @@ static void initScene() {
 static void initAnimation() {
   g_animator.attachSceneGraph(g_world);
   g_curKeyFrame = g_animator.keyFramesBegin();
-  //bubblingTimerCallback(0);
+
+
+  animateCloth(0);
 }
 
 int main(int argc, char * argv[]) {

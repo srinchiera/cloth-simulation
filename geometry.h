@@ -421,10 +421,10 @@ public:
     : vbo(new FormattedVbo(Vertex::FORMAT)) {
     wire(vbo);
     primitiveType(GL_TRIANGLES);
-    reset(vertices, numVertices);
+    upload(vertices, numVertices);
   }
 
-  void reset(const Vertex* vertices, int numVertices) {
+  void upload(const Vertex* vertices, int numVertices) {
     vbo->upload(vertices, numVertices, true);
   }
 };
@@ -448,10 +448,10 @@ public:
     wire(vbo);
     indexedBy(ibo);
     primitiveType(GL_TRIANGLES);
-    reset(vertices, indices, numVertices, numIndices);
+    upload(vertices, indices, numVertices, numIndices);
   }
 
-  void reset(const Vertex* vertices, const Index* indices, int numVertices, int numIndices) {
+  void upload(const Vertex* vertices, const Index* indices, int numVertices, int numIndices) {
     vbo->upload(vertices, numVertices, true);
     ibo->upload(indices, numIndices, true);
   }

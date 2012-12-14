@@ -1,7 +1,7 @@
 #ifndef CLOTH_H
 #define CLOTH_H
 
-#include <iostream.h>
+#include <iostream>
 #include "cvec.h"
 #include "geometry.h"
 
@@ -26,40 +26,29 @@ class Cloth
   }
 
   void updateVertices() {
+    updateNormals();
+
     std::vector<VertexPN>::iterator it = vertices.begin();
 
-    for(int i = 0; i < ballWidth; i++) {
-        for(int j = 0; j < ballHeight; j++)
+    for(int i = 0; i < ballWidth -1 ; i++) {
+        for(int j = 0; j < ballHeight-1; j++)
         {
-//            *it = VertexPN(getBallAt(i,j)->getPos(), getBallAt(i,j)->getNormal().normalize());
             *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
-            ++i;
+            ++it;
             *it = VertexPN(getBallAt(i,j)->getPos(), getBallAt(i,j)->getNormal().normalize());
-            ++i;
+            ++it;
             *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
-            ++i;
+            ++it;
             *it = VertexPN(getBallAt(i+1,j+1)->getPos(), getBallAt(i+1,j+1)->getNormal().normalize());
-            ++i;
-            *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i,j)->getNormal().normalize());
-            ++i;
+            ++it;
+            *it = VertexPN(getBallAt(i+1,j)->getPos(), getBallAt(i+1,j)->getNormal().normalize());
+            ++it;
             *it = VertexPN(getBallAt(i,j+1)->getPos(), getBallAt(i,j+1)->getNormal().normalize());
-            ++i;
-
+            ++it;
         }
     }
 
   }
-
-  void drawOneTriangle(Ball *ball1, Ball *ball2, Ball *ball3, Cvec3 color)
-	{
-		glColor3fv((GLfloat*) &color);
-		glNormal3fv((GLfloat *) &(ball1->getNormal().normalize()));
-		glVertex3fv((GLfloat *) &(ball1->getPos()));
-		glNormal3fv((GLfloat *) &(ball2->getNormal().normalize()));
-		glVertex3fv((GLfloat *) &(ball2->getPos()));
-		glNormal3fv((GLfloat *) &(ball3->getNormal().normalize()));
-		glVertex3fv((GLfloat *) &(ball3->getPos()));
-	}
 
   void updateNormals() {
     for (int i = 0; i < ballWidth; ++i) {
@@ -75,8 +64,6 @@ class Cloth
             getBallAt(i+1,j+1)->setNormal(normal);
             getBallAt(i+1,j)->setNormal(normal);
             getBallAt(i,j+1)->setNormal(normal);
-            std::cout << "hi";
-            std::flush(cout);
         }
     }
 
@@ -84,8 +71,6 @@ class Cloth
 
     Cvec3 triNorm(Ball *ball1, Ball *ball2, Ball *ball3) {
         double test = cross((ball2->getPos() - ball1->getPos()),(ball3->getPos() - ball1->getPos()))[1];
-            std::cout << test << "\n";
-            std::flush(cout);
 
         return cross((ball2->getPos() - ball1->getPos()),(ball3->getPos() - ball1->getPos()));
     }
@@ -94,13 +79,13 @@ public:
 //	Cloth (float width, float height, int ballWidth, int ballHeight) : ballWidth(ballWidth), ballHeight(ballHeight)
 	Cloth ()
 	{
-        int width = 10;
-        int height = 10;
+        int width = 5;
+        int height = 5;
         ballWidth = 45;
         ballHeight = 45;
 
 		balls.resize(ballWidth * ballHeight);
-		vertices.resize(ballWidth * ballHeight);
+		vertices.resize(ballWidth * ballHeight * 6);
 
     for (int x = 0; x < ballWidth; ++x)
 		  for (int y=0; y < ballHeight; ++y)
@@ -111,7 +96,7 @@ public:
         else
           pos2 = 0;
         Cvec3 position = Cvec3(width * (x / (float)ballWidth),pos2,height * (y / (float)ballHeight));
-			  balls[y * ballWidth + x] = Ball(position);
+			  balls[y * ballWidth + x] = Ball(position+Cvec3(0,4,0));
         balls[y * ballWidth + x].setAccel(Cvec3(0.,-0.1,0.));
 		  }
 
@@ -145,46 +130,11 @@ public:
     getBallAt(ballWidth-1,0)->fixMovement();
     getBallAt(0,ballHeight-1)->fixMovement();
     getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
-
+/*
     double g_time = .25;
     addForce(Cvec3(0,-0.2,0)*g_time);
     timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    addForce(Cvec3(0,-0.2,0)*g_time);
-    timeStep();
-    updateNormals();
-
+*/
     updateVertices();
 	}
 
@@ -200,34 +150,23 @@ public:
     getBallAt(ballWidth-1,ballHeight-1)->unfixMovement();
   }
 
-	void draw()
-	{
-		glBegin(GL_TRIANGLES);
-		for(int i = 0; i < ballWidth - 1; i++)
-		{
-			for(int j = 0; j < ballHeight - 1; j++)
-			{
-				Cvec3 color;
-        if (i % 2 || j % 2) 
-					color = Cvec3(255,255,255);
-				else
-					color = Cvec3(255.,0.0,255.);
-				drawOneTriangle(getBallAt(i+1,j), getBallAt(i,j), getBallAt(i,j+1), color);
-				drawOneTriangle(getBallAt(i+1,j+1), getBallAt(i+1,j), getBallAt(i,j+1), color);
-			}
-		}
-		glEnd();
-	}
-
   void collision(Cvec3 center, float radius)
 	{
    for (int i = 0, n = balls.size(); i < n; i++)
 	  {
 		  Cvec3 toCenter = balls[i].getPos() - center;
+//          if (i == 50) {
+//            std::cout << toCenter[0] << " " << toCenter[1] << " " << toCenter[2] << "\n";
+//            flush(std::cout);
+//          }
 		  float l = toCenter.length();
 
-		  if (l < radius)
-			  balls[i].movePos(toCenter.normalize() * (radius-l));
+		  if (l < radius) {
+            std::cout << "ow! " << (radius-l) << "\n";
+            flush(std::cout);
+//			balls[i].movePos(toCenter.normalize() * (radius-l));
+            balls[i].movePos(toCenter.normalize() * (radius-l));
+          }
 	  }
 	}
 
@@ -239,6 +178,7 @@ public:
 
 		for (int i = 0, n = balls.size(); i < n; i++)
 			balls[i].timeStep();
+        updateVertices();
 	}
 
 	void addForce(Cvec3 f)
