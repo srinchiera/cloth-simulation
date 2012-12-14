@@ -132,7 +132,7 @@ static Mesh g_bunnyMesh;
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
-static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node, g_light1, g_light2;
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_light1, g_light2;
 static shared_ptr<SgRbtNode> g_currentCameraNode;
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
 static shared_ptr<SgRbtNode> g_sphere2Node;
@@ -364,10 +364,6 @@ static void initSphere2() {
   vector<unsigned short> idx(ibLen);
   makeSphere(1, 20, 10, vtx.begin(), idx.begin());
   g_sphere2.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
-}
-
-static void initRobots() {
-  // Init whatever extra geometry  needed for the robots
 }
 
 static void initNormals(Mesh& m) {
@@ -814,7 +810,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'v':
   {
-    shared_ptr<SgRbtNode> viewers[] = {g_skyNode, g_robot1Node, g_robot2Node};
+    shared_ptr<SgRbtNode> viewers[] = {g_skyNode};
     for (int i = 0; i < 3; ++i) {
       if (g_currentCameraNode == viewers[i]) {
         g_currentCameraNode = viewers[(i+1)%3];
@@ -1104,97 +1100,23 @@ static void initMaterials() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-  // eachy layer of the shell uses a different material, though the materials will share the
-  // same shader files and some common uniforms. hence we create a prototype here, and will
-  // copy from the prototype later
-  Material bunnyShellMatPrototype("./shaders/bunny-shell-gl3.vshader", "./shaders/bunny-shell-gl3.fshader");
-  bunnyShellMatPrototype.getUniforms().put("uTexShell", shellTexture);
-  bunnyShellMatPrototype.getRenderStates()
-  .blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) // set blending mode
-  .enable(GL_BLEND) // enable blending
-  .disable(GL_CULL_FACE); // disable culling
+/*
+  // copy solid prototype, and set to wireframed rendering
+  g_arcballMat.reset(new Material(solid));
+  g_arcballMat->getUniforms().put("uColor", Cvec3f(0.27f, 0.82f, 0.35f));
+  g_arcballMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
+*/
+
 };
 
 static void initGeometry() {
   initGround();
   initSphere();
-  initRobots();
   initBunnyMeshes();
   initCubes();
 
   initSphere2();
   initCloth();
-}
-
-static void constructRobot(shared_ptr<SgTransformNode> base, shared_ptr<Material> material) {
-  const double ARM_LEN = 0.7,
-               ARM_THICK = 0.25,
-               LEG_LEN = 1,
-               LEG_THICK = 0.25,
-               TORSO_LEN = 1.5,
-               TORSO_THICK = 0.25,
-               TORSO_WIDTH = 1,
-               HEAD_SIZE = 0.7;
-  const int NUM_JOINTS = 10,
-            NUM_SHAPES = 10;
-
-  struct JointDesc {
-    int parent;
-    float x, y, z;
-  };
-
-  JointDesc jointDesc[NUM_JOINTS] = {
-    {-1}, // torso
-    {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper right arm
-    {0, -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
-    {1,  ARM_LEN, 0, 0}, // lower right arm
-    {2, -ARM_LEN, 0, 0}, // lower left arm
-    {0, TORSO_WIDTH/2-LEG_THICK/2, -TORSO_LEN/2, 0}, // upper right leg
-    {0, -TORSO_WIDTH/2+LEG_THICK/2, -TORSO_LEN/2, 0}, // upper left leg
-    {5, 0, -LEG_LEN, 0}, // lower right leg
-    {6, 0, -LEG_LEN, 0}, // lower left
-    {0, 0, TORSO_LEN/2, 0} // head
-  };
-
-  struct ShapeDesc {
-    int parentJointId;
-    float x, y, z, sx, sy, sz;
-    shared_ptr<Geometry> geometry;
-    shared_ptr<Material> material;
-  };
-
-  ShapeDesc shapeDesc[NUM_SHAPES] = {
-    {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube, material}, // torso
-    {1, ARM_LEN/2, 0, 0, ARM_LEN/2, ARM_THICK/2, ARM_THICK/2, g_sphere, material}, // upper right arm
-    {2, -ARM_LEN/2, 0, 0, ARM_LEN/2, ARM_THICK/2, ARM_THICK/2, g_sphere, material}, // upper left arm
-    {3, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube, material}, // lower right arm
-    {4, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube, material}, // lower left arm
-    {5, 0, -LEG_LEN/2, 0, LEG_THICK/2, LEG_LEN/2, LEG_THICK/2, g_sphere, material}, // upper right leg
-    {6, 0, -LEG_LEN/2, 0, LEG_THICK/2, LEG_LEN/2, LEG_THICK/2, g_sphere, material}, // upper left leg
-    {7, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube, material}, // lower right leg
-    {8, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube, material}, // lower left leg
-    {9, 0, HEAD_SIZE/2 * 1.5, 0, HEAD_SIZE/2, HEAD_SIZE/2, HEAD_SIZE/2, g_sphere, material}, // head
-  };
-
-  shared_ptr<SgTransformNode> jointNodes[NUM_JOINTS];
-
-  for (int i = 0; i < NUM_JOINTS; ++i) {
-    if (jointDesc[i].parent == -1)
-      jointNodes[i] = base;
-    else {
-      jointNodes[i].reset(new SgRbtNode(RigTForm(Cvec3(jointDesc[i].x, jointDesc[i].y, jointDesc[i].z))));
-      jointNodes[jointDesc[i].parent]->addChild(jointNodes[i]);
-    }
-  }
-  for (int i = 0; i < NUM_SHAPES; ++i) {
-    shared_ptr<MyShapeNode> shape(
-      new MyShapeNode(shapeDesc[i].geometry,
-                      shapeDesc[i].material,
-                      Cvec3(shapeDesc[i].x, shapeDesc[i].y, shapeDesc[i].z),
-                      Cvec3(0, 0, 0),
-                      Cvec3(shapeDesc[i].sx, shapeDesc[i].sy, shapeDesc[i].sz)));
-    jointNodes[shapeDesc[i].parentJointId]->addChild(shape);
-  }
 }
 
 static void initScene() {
@@ -1205,13 +1127,6 @@ static void initScene() {
   g_groundNode.reset(new SgRbtNode(Cvec3(0, g_groundY, 0)));
   g_groundNode->addChild(shared_ptr<MyShapeNode>(
                            new MyShapeNode(g_ground, g_bumpFloorMat)));
-
-  g_robot1Node.reset(new SgRbtNode(RigTForm(Cvec3(-8, 1, 0))));
-  g_robot2Node.reset(new SgRbtNode(RigTForm(Cvec3(8, 1, 0))));
-
-
-  constructRobot(g_robot1Node, g_redDiffuseMat); // a Red robot
-  constructRobot(g_robot2Node, g_blueDiffuseMat); // a Blue robot
 
   g_light1.reset(new SgRbtNode(RigTForm(Cvec3(4.0, 3.0, 5.0))));
   g_light2.reset(new SgRbtNode(RigTForm(Cvec3(-4, 1.0, -4.0))));
@@ -1238,8 +1153,6 @@ static void initScene() {
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
-  g_world->addChild(g_robot1Node);
-  g_world->addChild(g_robot2Node);
   g_world->addChild(g_light1);
   g_world->addChild(g_light2);
   g_world->addChild(g_bunnyNode);
