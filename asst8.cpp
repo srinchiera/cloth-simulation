@@ -104,6 +104,10 @@ static shared_ptr<Material> g_redDiffuseMat,
                             g_shinyMat;
 
 static shared_ptr<Material> g_bunnyMat; // for the bunny
+static shared_ptr<Material> g_clothMat; // for the bunny
+
+// wireframe?
+static bool g_clothWire = false;
 
 static vector<shared_ptr<Material> > g_bunnyShellMats; // for bunny shells
 
@@ -118,7 +122,7 @@ typedef SgGeometryShapeNode MyShapeNode;
 static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 static shared_ptr<Geometry> g_sphere2;
 static shared_ptr<SimpleGeometryPN> g_clothGeometry;
-static Cloth g_cloth;
+Cloth g_cloth;
 static Cvec3 clothTranslation = Cvec3(-2.5,-.5,-2.5);
 
 static shared_ptr<SimpleGeometryPN> g_meshGeometry;
@@ -831,7 +835,11 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     g_displayArcball = !g_displayArcball;
     break;
   case 'u':
-
+    g_cloth.unfix2();
+    break;
+  case 'r':
+    g_cloth = Cloth();
+    break;
   case 'n':
     if (g_playingAnimation) {
       cerr << "Cannot operate when playing animation" << endl;
@@ -902,8 +910,13 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     }
     break;
   case 'w':
-    cerr << "Writing animation to animation.txt\n";
-    g_animator.saveAnimation("animation.txt");
+    if (g_clothWire) {
+        g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        g_clothWire = false;
+    } else {
+        g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        g_clothWire = true;
+    }
     break;
   case 'i':
     if (g_playingAnimation) {
@@ -1094,18 +1107,11 @@ static void initMaterials() {
   // bunny shell materials;
   shared_ptr<ImageTexture> shellTexture(new ImageTexture("shell.ppm", false)); // common shell texture
 
-  // needs to enable repeating of texture coordinates
-  shellTexture->bind();
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-/*
   // copy solid prototype, and set to wireframed rendering
-  g_arcballMat.reset(new Material(solid));
-  g_arcballMat->getUniforms().put("uColor", Cvec3f(0.27f, 0.82f, 0.35f));
-  g_arcballMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
-*/
+  g_clothMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader"));
+  g_clothMat->getUniforms().put("uColor", Cvec3f(102./255., 0./255., 153./255.));
+  g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//  g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 };
 
@@ -1149,7 +1155,7 @@ static void initScene() {
 
   g_clothNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
   g_clothNode->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_clothGeometry, g_shinyMat, clothTranslation)));
+                          new MyShapeNode(g_clothGeometry, g_clothMat, clothTranslation)));
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);

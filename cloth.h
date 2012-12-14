@@ -20,8 +20,7 @@ class Cloth
   void newSpring(Ball *ball1, Ball *ball2) {
     springs.push_back(Spring(ball1,ball2));
   }
-
-	Ball* getBallAt (int x, int y) {
+    Ball* getBallAt (int x, int y) {
     return &balls[y * ballWidth + x];
   }
 
@@ -47,7 +46,6 @@ class Cloth
             ++it;
         }
     }
-
   }
 
   void updateNormals() {
@@ -128,8 +126,8 @@ public:
 
     getBallAt(0,0)->fixMovement();
     getBallAt(ballWidth-1,0)->fixMovement();
-//    getBallAt(0,ballHeight-1)->fixMovement();
-//    getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
+    getBallAt(0,ballHeight-1)->fixMovement();
+    getBallAt(ballWidth-1,ballHeight-1)->fixMovement();
 
     updateVertices();
 	}
@@ -145,6 +143,13 @@ public:
     getBallAt(0,ballHeight-1)->unfixMovement();
     getBallAt(ballWidth-1,ballHeight-1)->unfixMovement();
   }
+
+  void unfix2()
+  {
+    getBallAt(0,ballHeight-1)->unfixMovement();
+    getBallAt(ballWidth-1,ballHeight-1)->unfixMovement();
+  }
+
 
   void collision(Cvec3 center, float radius)
 	{
