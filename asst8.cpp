@@ -170,7 +170,10 @@ struct sphereComp {
 
 };
 
+static bool g_bunny = false;
 static std::vector<struct sphereComp> g_spheres;
+static std::vector<struct sphereComp> g_normalSphere;
+static std::vector<struct sphereComp> g_bunnySpheres;
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -271,7 +274,6 @@ static void createBunnySpheres () {
     sphere.setRad(.85).setPos(Cvec3(.343,-.225,0));
     g_spheres.push_back(sphere);
 
-
     sphere.setRad(.4).setPos(Cvec3(.97,-.48,.05));
     g_spheres.push_back(sphere);
 
@@ -284,7 +286,10 @@ static void createBunnySpheres () {
 }
 
 static void initSpheres() {
-    createBunnySpheres();
+    createNormalSphere();
+//    createBunnySpheres();
+//    g_spheres = g_normalSphere;
+
     std::vector<struct sphereComp>::iterator it = g_spheres.begin();
     for (int i = 0; i < g_spheres.size(); i++) {
       int ibLen, vbLen;
@@ -432,7 +437,7 @@ static void drawArcBall(Uniforms& uniforms) {
 }
 
 static void drawStuff(bool picking) {
-  clothCollisions();
+//  clothCollisions();
 //  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
 //  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
 
@@ -662,7 +667,6 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     << "h\t\thelp menu\n"
     << "s\t\tsave screenshot\n"
     << "p\t\tUse mouse to pick a part to edit\n"
-    << "v\t\tCycle view\n"
     << "drag left mouse to rotate\n"
     << "a\t\tToggle display arcball\n"
     << "space\t\tRelease cloth\n"
@@ -674,17 +678,6 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     glFlush();
     writePpmScreenshot(g_windowWidth, g_windowHeight, "out.ppm");
     break;
-  case 'v':
-  {
-    shared_ptr<SgRbtNode> viewers[] = {g_skyNode};
-    for (int i = 0; i < 3; ++i) {
-      if (g_currentCameraNode == viewers[i]) {
-        g_currentCameraNode = viewers[(i+1)%3];
-        break;
-      }
-    }
-  }
-  break;
   case ' ':
     g_cloth.unfix();
     break;
@@ -714,6 +707,14 @@ static void keyboard(const unsigned char key, const int x, const int y) {
         g_clothWire = true;
     }
     break;
+  case 'b':
+    if (g_bunny) {
+        g_world->removeChild(g_bunnyNode);
+        g_bunny = false;
+    } else {
+        g_world->addChild(g_bunnyNode);
+        g_bunny = true;
+    }
   }
 
   glutPostRedisplay();
@@ -890,7 +891,7 @@ static void initScene() {
   g_world->addChild(g_groundNode);
   g_world->addChild(g_light1);
   g_world->addChild(g_light2);
-  g_world->addChild(g_bunnyNode);
+//  g_world->addChild(g_bunnyNode);
 
 //  g_world->addChild(g_sphere2Node);
   g_world->addChild(g_clothNode);

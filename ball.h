@@ -11,7 +11,7 @@ class Ball
 {
   float mass;
   Cvec3 accel; //accel
-	Cvec3 pos; //current position
+  	Cvec3 pos; //current position
 	Cvec3 prevPos; //old position
 	Cvec3 normal; // normal
   bool canMove;
