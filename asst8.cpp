@@ -86,7 +86,7 @@ static int g_activeShader = 0;
 
 static SkyMode g_activeCameraFrame = WORLD_SKY;
 
-static bool g_displayArcball = true;
+static bool g_displayArcball = false;
 static double g_arcballScreenRadius = 100; // number of pixels
 static double g_arcballScale = 1;
 
@@ -104,7 +104,8 @@ static shared_ptr<Material> g_redDiffuseMat,
                             g_shinyMat;
 
 static shared_ptr<Material> g_bunnyMat; // for the bunny
-static shared_ptr<Material> g_clothMat; // for the bunny
+static shared_ptr<Material> g_clothMat;
+static shared_ptr<Material> g_sphereMat;
 
 // wireframe?
 static bool g_clothWire = false;
@@ -157,6 +158,15 @@ static double g_numStepsPerFrame = 10;
 static double g_damping = 0.96;
 static double g_stiffness = 10;
 static int g_simulationsPerSecond = 60;
+
+struct sphereComp {
+    Cvec3 pos;
+    float radius;
+    shared_ptr<Geometry> geometry;
+    shared_ptr<SgRbtNode> node;
+};
+
+static std::vector<struct sphereComp> g_spheres;
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -226,6 +236,22 @@ static void initSphere2() {
   vector<unsigned short> idx(ibLen);
   makeSphere(1, 20, 10, vtx.begin(), idx.begin());
   g_sphere2.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
+}
+
+static void initSpheres() {
+    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
+    for (int i = 0; i < g_spheres.size(); i++) {
+      int ibLen, vbLen;
+      getSphereVbIbLen(20, 10, vbLen, ibLen);
+
+      // Temporary storage for sphere Geometry
+      vector<VertexPNTBX> vtx(vbLen);
+      vector<unsigned short> idx(ibLen);
+      makeSphere((*it).radius, 20, 10, vtx.begin(), idx.begin());
+
+      ((*it).geometry).reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
+      ++it;
+    }
 }
 
 static void initNormals(Mesh& m) {
@@ -665,8 +691,6 @@ static void initGLState() {
   glClearDepth(0.);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-//  glCullFace(GL_BACK);
-//  glEnable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_GREATER);
   glReadBuffer(GL_BACK);
@@ -740,8 +764,12 @@ static void initMaterials() {
   .put("uColorAmbient", Cvec3f(0.45f, 0.3f, 0.3f))
   .put("uColorDiffuse", Cvec3f(0.2f, 0.2f, 0.2f));
 
+  g_sphereMat.reset(new Material(diffuse));
+  g_sphereMat->getUniforms().put("uColor", Cvec3f(195./255., 9./255., 9./255.));
+
   // copy solid prototype, and set to wireframed rendering
   g_clothMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader"));
+//  g_clothMat.reset(new Material("./shaders/velvet-gl2.vshader", "./shaders/velvet-gl2.fshader"));
   g_clothMat->getUniforms().put("uColor", Cvec3f(102./255., 0./255., 153./255.));
   g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -754,7 +782,37 @@ static void initGeometry() {
   initCubes();
 
   initSphere2();
+  initSpheres();
   initCloth();
+}
+
+static void createBunnySpheres () {
+
+}
+
+static void createNormalSphere () {
+    g_spheres.clear();
+
+    struct sphereComp sphere = {radius = 1, pos = Cvec(0,1,0)};
+    sphere.radius = 1;
+    sphere.pos = Cvec3(0,1,0);
+
+    g_spheres.push_back(sphere);
+}
+
+static void initSphereNodes() {
+    createNormalSphere();
+    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
+    for (int i = 0; i < g_spheres.size(); i++) {
+
+      ((*it).node).reset(new SgRbtNode((*it).pos));
+      ((*it).node)->addChild(shared_ptr<MyShapeNode>(
+                              new MyShapeNode(g_sphere2, g_sphereMat)));
+
+      g_world->addChild((*it).node);
+
+      ++it;
+    }
 }
 
 static void initScene() {
@@ -775,7 +833,7 @@ static void initScene() {
                        new MyShapeNode(g_sphere, g_lightMat, Cvec3(0), Cvec3(0), Cvec3(0.5))));
 
   // create a single transform node for both the bunny and the bunny shells
-  g_bunnyNode.reset(new SgRbtNode(Cvec3(-3.0,0.0,-4.0)));
+  g_bunnyNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
 
   // add bunny as a shape nodes
   g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
@@ -783,7 +841,9 @@ static void initScene() {
 
   g_sphere2Node.reset(new SgRbtNode());
   g_sphere2Node->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_sphere2, g_bunnyMat)));
+                          new MyShapeNode(g_sphere2, g_sphereMat)));
+
+  initSphereNodes();
 
   g_clothNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
   g_clothNode->addChild(shared_ptr<MyShapeNode>(
@@ -795,7 +855,7 @@ static void initScene() {
   g_world->addChild(g_light2);
   g_world->addChild(g_bunnyNode);
 
-  g_world->addChild(g_sphere2Node);
+//  g_world->addChild(g_sphere2Node);
   g_world->addChild(g_clothNode);
 
   g_currentCameraNode = g_skyNode;
