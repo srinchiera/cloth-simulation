@@ -164,7 +164,7 @@ public:
 	{
    for (int i = 0, n = balls.size(); i < n; i++)
 	  {
-          float bufferedRadius = radius + .03;
+          float bufferedRadius = radius + .05;
 		  Cvec3 toCenter = balls[i].getPos() - center;
 
 		  float l = toCenter.length();

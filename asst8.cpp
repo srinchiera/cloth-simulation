@@ -164,6 +164,10 @@ struct sphereComp {
     float radius;
     shared_ptr<Geometry> geometry;
     shared_ptr<SgRbtNode> node;
+
+    sphereComp& setPos(Cvec3 p) { pos = p; return *this;}
+    sphereComp& setRad(float r) { radius = r; return *this;}
+
 };
 
 static std::vector<struct sphereComp> g_spheres;
@@ -204,12 +208,24 @@ static void initCloth() {
   g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size()));
 }
 
+static void clothCollisions() {
+    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
+    for (int i = 0; i < g_spheres.size(); i++) {
+      int ibLen, vbLen;
+
+      g_cloth.collision((*((*it).node)).getRbt().getTranslation()-clothTranslation,(*it).radius);
+
+      ++it;
+    }
+
+}
 static void animateCloth(int dontCare) {
 
   int vbLen = 45*45*6;
   g_cloth.addForce(Cvec3(0,-0.2,0)*.25);
   g_cloth.timeStep();
-  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
+  clothCollisions();
+//  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
 
   g_clothGeometry->upload(&(g_cloth.getVertices()[0]), vbLen);
   glutTimerFunc(1000/g_animateFramesPerSecond, animateCloth, 0);
@@ -238,7 +254,37 @@ static void initSphere2() {
   g_sphere2.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
 }
 
+static void createNormalSphere () {
+    g_spheres.clear();
+
+    struct sphereComp sphere;
+    sphere.setRad(1).setPos(Cvec3(0,0,0));
+
+    g_spheres.push_back(sphere);
+}
+
+static void createBunnySpheres () {
+
+    g_spheres.clear();
+    struct sphereComp sphere;
+
+    sphere.setRad(.85).setPos(Cvec3(.343,-.225,0));
+    g_spheres.push_back(sphere);
+
+
+    sphere.setRad(.4).setPos(Cvec3(.97,-.48,.05));
+    g_spheres.push_back(sphere);
+
+    sphere.setRad(.6).setPos(Cvec3(-.43,0,0));
+    g_spheres.push_back(sphere);
+
+    sphere.setRad(.49).setPos(Cvec3(-.66,.51,.19));
+    g_spheres.push_back(sphere);
+
+}
+
 static void initSpheres() {
+    createBunnySpheres();
     std::vector<struct sphereComp>::iterator it = g_spheres.begin();
     for (int i = 0; i < g_spheres.size(); i++) {
       int ibLen, vbLen;
@@ -247,7 +293,8 @@ static void initSpheres() {
       // Temporary storage for sphere Geometry
       vector<VertexPNTBX> vtx(vbLen);
       vector<unsigned short> idx(ibLen);
-      makeSphere((*it).radius, 20, 10, vtx.begin(), idx.begin());
+      makeSphere(1, 20, 10, vtx.begin(), idx.begin());
+//      makeSphere((*it).radius, 20, 10, vtx.begin(), idx.begin());
 
       ((*it).geometry).reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
       ++it;
@@ -385,8 +432,9 @@ static void drawArcBall(Uniforms& uniforms) {
 }
 
 static void drawStuff(bool picking) {
-  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
-  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
+  clothCollisions();
+//  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
+//  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
 
   // if we are not translating, update arcball scale
   if (!(g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)))
@@ -786,28 +834,17 @@ static void initGeometry() {
   initCloth();
 }
 
-static void createBunnySpheres () {
 
-}
-
-static void createNormalSphere () {
-    g_spheres.clear();
-
-    struct sphereComp sphere = {radius = 1, pos = Cvec(0,1,0)};
-    sphere.radius = 1;
-    sphere.pos = Cvec3(0,1,0);
-
-    g_spheres.push_back(sphere);
-}
 
 static void initSphereNodes() {
-    createNormalSphere();
     std::vector<struct sphereComp>::iterator it = g_spheres.begin();
     for (int i = 0; i < g_spheres.size(); i++) {
 
+      float rad = (*it).radius;
+      Cvec3 scale = Cvec3(rad,rad,rad);
       ((*it).node).reset(new SgRbtNode((*it).pos));
       ((*it).node)->addChild(shared_ptr<MyShapeNode>(
-                              new MyShapeNode(g_sphere2, g_sphereMat)));
+                              new MyShapeNode(g_sphere2, g_sphereMat,Cvec3(0,0,0),Cvec3(0,0,0),scale)));
 
       g_world->addChild((*it).node);
 
