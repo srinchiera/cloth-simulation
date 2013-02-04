@@ -19,9 +19,9 @@ public:
 
 	void calcSpring()
 	{
-		Cvec3 vec = ball2->getPos() - ball1->getPos();
-		float currLen = vec.length();
-		Cvec3 moveLen = (vec * (1 - len/currLen)) / 2;
+		Cvec3 vec = ball2->getPos() - ball1->getPos(); //vector connecting the springs
+		float currLen = vec.length(); 
+		Cvec3 moveLen = (vec * (1 - len/currLen)) / 2; //calculate the length each ball has to move
 		ball1->movePos(moveLen);
 		ball2->movePos(-moveLen);
 	}

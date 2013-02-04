@@ -40,6 +40,8 @@
 #include "drawer.h"
 #include "picker.h"
 #include "mesh.h"
+
+// include new headers
 #include "spring.h"
 #include "ball.h"
 #include "cloth.h"
@@ -49,30 +51,14 @@ using namespace tr1;
 
 // G L O B A L S ///////////////////////////////////////////////////
 
-// --------- IMPORTANT --------------------------------------------------------
-// Before you start working on this assignment, set the following variable
-// properly to indicate whether you want to use OpenGL 2.x with GLSL 1.0 or
-// OpenGL 3.x+ with GLSL 1.3.
-//
-// Set g_Gl2Compatible = true to use GLSL 1.0 and g_Gl2Compatible = false to
-// use GLSL 1.3. Make sure that your machine supports the version of GLSL you
-// are using. In particular, on Mac OS X currently there is no way of using
-// OpenGL 3.x with GLSL 1.3 when GLUT is used.
-//
-// If g_Gl2Compatible=true, shaders with -gl2 suffix will be loaded.
-// If g_Gl2Compatible=false, shaders with -gl3 suffix will be loaded.
-// To complete the assignment you only need to edit the shader files that get
-// loaded
-// ----------------------------------------------------------------------------
 const bool g_Gl2Compatible = true;
-
 
 static const float g_frustMinFov = 60.0;  // A minimal of 60 degree field of view
 static float g_frustFovY = g_frustMinFov; // FOV in y direction (updated by updateFrustFovY)
 
 static const float g_frustNear = -0.1;    // near plane
 static const float g_frustFar = -50.0;    // far plane
-static const float g_groundY = -2.0;      // y coordinate of the ground
+static const float g_groundY = -2.5;      // y coordinate of the ground
 static const float g_groundSize = 10.0;   // half the ground length
 
 enum SkyMode {WORLD_SKY=0, SKY_SKY=1};
@@ -82,7 +68,6 @@ static int g_windowHeight = 512;
 static bool g_mouseClickDown = false;    // is the mouse button pressed
 static bool g_mouseLClickButton, g_mouseRClickButton, g_mouseMClickButton;
 static int g_mouseClickX, g_mouseClickY; // coordinates for mouse click event
-static int g_activeShader = 0;
 
 static SkyMode g_activeCameraFrame = WORLD_SKY;
 
@@ -92,148 +77,215 @@ static double g_arcballScale = 1;
 
 static bool g_pickingMode = false;
 
-static bool g_playingAnimation = false;
-
 // --------- Materials
-static shared_ptr<Material> g_redDiffuseMat,
-                            g_blueDiffuseMat,
-                            g_bumpFloorMat,
+static shared_ptr<Material> g_bumpFloorMat,
                             g_arcballMat,
                             g_pickingMat,
                             g_lightMat,
-                            g_shinyMat;
-
-static shared_ptr<Material> g_bunnyMat; // for the bunny
-static shared_ptr<Material> g_clothMat;
-static shared_ptr<Material> g_sphereMat;
-
-// wireframe?
-static bool g_clothWire = false;
-
-static vector<shared_ptr<Material> > g_bunnyShellMats; // for bunny shells
+                            g_bunnyMat; // for the bunny
 
 shared_ptr<Material> g_overridingMaterial;
-
-static bool g_smoothSubdRendering = false;
 
 // --------- Geometry
 typedef SgGeometryShapeNode MyShapeNode;
 
-// Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
-static shared_ptr<Geometry> g_sphere2;
-static shared_ptr<SimpleGeometryPN> g_clothGeometry;
-Cloth g_cloth;
-static Cvec3 clothTranslation = Cvec3(-2.5,-.5,-2.5);
-
-static shared_ptr<SimpleGeometryPN> g_meshGeometry;
-static Mesh g_mesh;
-
-static int g_subdLevels = 0;
-
+// Vertex buffer and index buffer associated with the ground and light
+// geometry
+static shared_ptr<Geometry> g_ground, g_sphere;
 static shared_ptr<SimpleGeometryPN> g_bunnyGeometry;
 static Mesh g_bunnyMesh;
 
 // --------- Scene
 
 static shared_ptr<SgRootNode> g_world;
-static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_light1, g_light2;
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_light1, g_light2, g_bunnyNode;
 static shared_ptr<SgRbtNode> g_currentCameraNode;
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode;
-static shared_ptr<SgRbtNode> g_sphere2Node;
-static shared_ptr<SgRbtNode> g_clothNode;
 
-//static shared_ptr<SgRbtNode> g_clothNode;
+/// FINAL PROJECT GLOBALS ///
 
+Cloth g_cloth; // global cloth variable
 
-static shared_ptr<SgRbtNode> g_bunnyNode;
+static bool g_clothWire = false; // cloth is wirefram or filled
+static Cvec3 clothTranslation = Cvec3(-2.5,-.5,-2.5); // center cloth on screen
 
-static int g_msBetweenKeyFrames = 2000; // 2 seconds between keyframes
-static int g_animateFramesPerSecond = 60; // frames to render per second during animation playback
+static shared_ptr<SimpleGeometryPN> g_clothGeometry; // vertices of cloth
+static shared_ptr<SgRbtNode> g_clothNode; // cloth node
 
-// Global variables for used physical simulation
-static const Cvec3 g_gravity(0, -0.5, 0);  // gavity vector
-static double g_timeStep = 0.02;
-static double g_numStepsPerFrame = 10;
-static double g_damping = 0.96;
-static double g_stiffness = 10;
-static int g_simulationsPerSecond = 60;
+// new cloth and sphere materials
+static shared_ptr<Material> g_clothMat;
+static shared_ptr<Material> g_sphereMat;
 
+// Struct that contains information for rendering nodes on the screen
+// and detecting collisions with the cloth.
 struct sphereComp {
-    Cvec3 pos;
-    float radius;
-    shared_ptr<Geometry> geometry;
-    shared_ptr<SgRbtNode> node;
+  Cvec3 pos;
+  float radius;
+  shared_ptr<Geometry> geometry;
+  shared_ptr<SgRbtNode> node;
 
-    sphereComp& setPos(Cvec3 p) { pos = p; return *this;}
-    sphereComp& setRad(float r) { radius = r; return *this;}
-
+  // functions for easily setting values
+  sphereComp& setPos(Cvec3 p) { pos = p; return *this;}
+  sphereComp& setRad(float r) { radius = r; return *this;}
 };
 
-static bool g_bunny = false;
-static std::vector<struct sphereComp> g_spheres;
-static std::vector<struct sphereComp> g_normalSphere;
-static std::vector<struct sphereComp> g_bunnySpheres;
+static bool g_bunny = false; // render bunny or sphere
+static bool g_isWind = false;
+static std::vector<struct sphereComp> g_spheres; // handles collisions with cloth
+static std::vector<struct sphereComp> g_normalSphere; // vector containing a single sphere
+static std::vector<struct sphereComp> g_bunnySpheres; // vector containing spheres that make up bunny
+
+static const Cvec3 g_gravity(0, -0.025, 0);  // gravity vector
+static const Cvec3 g_wind(-.02, 0, 0);  // wind vector
+static int g_animateFramesPerSecond = 60; // cloth frames to render per second
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
-
 
 static VertexPN getVertexPN(Mesh& m, const int face, const int vertex);
 static VertexPNX getFurVertexPNX(Mesh& m, const int face, const int vertex, int shellNum);
 
-static void initGround() {
-  int ibLen, vbLen;
-  getPlaneVbIbLen(vbLen, ibLen);
+/// FINAL PROJECT SIGNATURES ///
 
-  // Temporary storage for cube Geometry
-  vector<VertexPNTBX> vtx(vbLen);
-  vector<unsigned short> idx(ibLen);
+static void initCloth(); // initialize global cloth object
+static void animateCloth(int dontCare); // cloth animation loop
+static void clothCollisions(); // detect collisions with spheres and updates vertices
 
-  makePlane(g_groundSize*2, vtx.begin(), idx.begin());
-  g_ground.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vbLen, ibLen));
-}
+static void initSpheres(); // initialize objects composed of spheres
+static void initNormalSphere (); // create single centered sphere
+static void initBunnySpheres (); // create sphere bunny
+static void initSphereGeometry(std::vector<struct sphereComp> &v); // initialize geometry of sphere object
 
-static void initCubes() {
-  int ibLen, vbLen;
-  getCubeVbIbLen(vbLen, ibLen);
+static void initSphereNodes(); // create nodes for each of the spheres in the objects
+// initializes nodes for all spheres in an object
+static void initSphereNode(std::vector<struct sphereComp> &v, bool add);
+// remove all of an objects sphere nodes from world
+static void removeSphereNodes(std::vector<struct sphereComp> &v);
+// add all of an objects sphere nodes from world
+static void addSphereNodes(std::vector<struct sphereComp> &v);
 
-  // Temporary storage for cube Geometry
-  vector<VertexPNTBX> vtx(vbLen);
-  vector<unsigned short> idx(ibLen);
+/// END FINAL PROJECT SIGNATURES ///
 
-  makeCube(1, vtx.begin(), idx.begin());
-  g_cube.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vbLen, ibLen));
-}
+/// FINAL PROJECT FUNCTIONS ///
 
+// initializes a global cloth object and gets its geometry
 static void initCloth() {
   g_cloth.loadDimensions(5,5,45,45);
-
   g_clothGeometry.reset(new SimpleGeometryPN(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size()));
 }
 
-static void clothCollisions() {
-    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
-    for (int i = 0; i < g_spheres.size(); i++) {
-      int ibLen, vbLen;
-
-      g_cloth.collision((*((*it).node)).getRbt().getTranslation()-clothTranslation,(*it).radius);
-
-      ++it;
-    }
-
-}
+// cloth animation loop
 static void animateCloth(int dontCare) {
+  g_cloth.addForce(g_gravity); // add forces
+  if (g_isWind)
+    g_cloth.addWind(g_wind);
+  g_cloth.timeStep(); // calculate cloth configuration in next time interval
+  clothCollisions(); // detect collisions with spheres
 
-  int vbLen = 45*45*6;
-  g_cloth.addForce(Cvec3(0,-0.2,0)*.25);
-  g_cloth.timeStep();
-  clothCollisions();
-//  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
-
-  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), vbLen);
+  std::vector<VertexPN> clothVertices = g_cloth.getVertices();
+  g_clothGeometry->upload(&(clothVertices[0]), clothVertices.size()); // update cloth vertices
   glutTimerFunc(1000/g_animateFramesPerSecond, animateCloth, 0);
   glutPostRedisplay();
 }
+
+// loop over each sphere in object and feed it to the collision object to
+// react to an an intersection.
+static void clothCollisions() {
+  std::vector<struct sphereComp>::iterator iter;
+  for (iter = g_spheres.begin(); iter != g_spheres.end(); iter++) {
+    g_cloth.collision((*((*iter).node)).getRbt().getTranslation()-
+      (*g_clothNode).getRbt().getTranslation(), (*iter).radius,g_groundY+0.6);
+  }
+}
+
+// initializes the geometries for different objects composed of spheres
+static void initSpheres() {
+  initNormalSphere();
+  initBunnySpheres();
+}
+
+// create a single sphere centered in middle
+static void initNormalSphere () {
+  g_normalSphere.clear();
+
+  struct sphereComp sphere;
+  sphere.setRad(1).setPos(Cvec3(0,0,0));
+  g_normalSphere.push_back(sphere);
+
+  initSphereGeometry(g_normalSphere);
+}
+
+// create bunny obect from spheres
+static void initBunnySpheres () {
+  g_bunnySpheres.clear();
+  struct sphereComp sphere;
+
+  sphere.setRad(.85).setPos(Cvec3(.343,-.225,0));
+  g_bunnySpheres.push_back(sphere);
+
+  sphere.setRad(.6).setPos(Cvec3(.97,-.48,.05));
+  g_bunnySpheres.push_back(sphere);
+
+  sphere.setRad(.8).setPos(Cvec3(-.43,0,0));
+  g_bunnySpheres.push_back(sphere);
+
+  sphere.setRad(.49).setPos(Cvec3(-.66,.51,.19));
+  g_bunnySpheres.push_back(sphere);
+
+  initSphereGeometry(g_bunnySpheres);
+}
+
+// use geometrymaker, makeSphere to create a sphere geometry for each sphere in
+// object.
+static void initSphereGeometry(std::vector<struct sphereComp> &v){
+  std::vector<struct sphereComp>::iterator iter;
+  for (iter = v.begin(); iter != v.end(); iter++) {
+    int ibLen, vbLen;
+    getSphereVbIbLen(20, 10, vbLen, ibLen);
+
+    vector<VertexPNTBX> vtx(vbLen);
+    vector<unsigned short> idx(ibLen);
+    makeSphere((*iter).radius, 20, 10, vtx.begin(), idx.begin());
+
+    ((*iter).geometry).reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
+  }
+}
+
+// create nodes for each spheres in each of the objects
+static void initSphereNodes() {
+  initSphereNode(g_normalSphere,true);
+  initSphereNode(g_bunnySpheres,false);
+  g_spheres = g_normalSphere;
+}
+
+// for each of the spheres in the object, create a new node using its geometry
+// and the sphere material
+static void initSphereNode(std::vector<struct sphereComp> &v, bool add) {
+  std::vector<struct sphereComp>::iterator iter;
+  for (iter = v.begin(); iter != v.end(); iter++)  {
+    ((*iter).node).reset(new SgRbtNode((*iter).pos));
+    ((*iter).node)->addChild(shared_ptr<MyShapeNode>(new MyShapeNode((*iter).geometry, g_sphereMat)));
+
+    // we start by adding the normalSphere to the world
+    if (add) 
+      g_world->addChild((*iter).node);
+  }
+}
+
+// add all of object's sphere nodes to the world
+static void addSphereNodes(std::vector<struct sphereComp> &v) {
+  std::vector<struct sphereComp>::iterator iter;
+  for (iter = v.begin(); iter != v.end(); iter++) 
+    g_world->addChild((*iter).node);
+}
+
+// remove all of object's sphere nodes from the world
+static void removeSphereNodes(std::vector<struct sphereComp> &v) {
+  std::vector<struct sphereComp>::iterator iter;
+  for (iter = v.begin(); iter != v.end(); iter++) 
+    g_world->removeChild((*iter).node);
+}
+
+/// END FINAL PROJECT FUNCTIONS ///
 
 static void initSphere() {
   int ibLen, vbLen;
@@ -246,64 +298,15 @@ static void initSphere() {
   g_sphere.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
 }
 
-static void initSphere2() {
+static void initGround() {
   int ibLen, vbLen;
-  getSphereVbIbLen(20, 10, vbLen, ibLen);
+  getPlaneVbIbLen(vbLen, ibLen);
 
-  // Temporary storage for sphere Geometry
   vector<VertexPNTBX> vtx(vbLen);
   vector<unsigned short> idx(ibLen);
-  makeSphere(1, 20, 10, vtx.begin(), idx.begin());
-  g_sphere2.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
-}
 
-static void createNormalSphere () {
-    g_spheres.clear();
-
-    struct sphereComp sphere;
-    sphere.setRad(1).setPos(Cvec3(0,0,0));
-
-    g_spheres.push_back(sphere);
-}
-
-static void createBunnySpheres () {
-
-    g_spheres.clear();
-    struct sphereComp sphere;
-
-    sphere.setRad(.85).setPos(Cvec3(.343,-.225,0));
-    g_spheres.push_back(sphere);
-
-    sphere.setRad(.4).setPos(Cvec3(.97,-.48,.05));
-    g_spheres.push_back(sphere);
-
-    sphere.setRad(.6).setPos(Cvec3(-.43,0,0));
-    g_spheres.push_back(sphere);
-
-    sphere.setRad(.49).setPos(Cvec3(-.66,.51,.19));
-    g_spheres.push_back(sphere);
-
-}
-
-static void initSpheres() {
-    createNormalSphere();
-//    createBunnySpheres();
-//    g_spheres = g_normalSphere;
-
-    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
-    for (int i = 0; i < g_spheres.size(); i++) {
-      int ibLen, vbLen;
-      getSphereVbIbLen(20, 10, vbLen, ibLen);
-
-      // Temporary storage for sphere Geometry
-      vector<VertexPNTBX> vtx(vbLen);
-      vector<unsigned short> idx(ibLen);
-      makeSphere(1, 20, 10, vtx.begin(), idx.begin());
-//      makeSphere((*it).radius, 20, 10, vtx.begin(), idx.begin());
-
-      ((*it).geometry).reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vtx.size(), idx.size()));
-      ++it;
-    }
+  makePlane(g_groundSize*2, vtx.begin(), idx.begin());
+  g_ground.reset(new SimpleIndexedGeometryPNTBX(&vtx[0], &idx[0], vbLen, ibLen));
 }
 
 static void initNormals(Mesh& m) {
@@ -324,38 +327,9 @@ static void initNormals(Mesh& m) {
   }
 }
 
-static void subdivide(Mesh& m) {
-  for (int i = 0; i < m.getNumFaces(); ++i) {
-    const Mesh::Face f = m.getFace(i);
-    m.setNewFaceVertex(f, Cvec3(0));
-    for (int j = f.getNumVertices()-1; j >= 0; --j) {
-      m.setNewFaceVertex(f, m.getNewFaceVertex(f) + f.getVertex(j).getPosition());
-    }
-    m.setNewFaceVertex(f, m.getNewFaceVertex(f) / f.getNumVertices());
-  }
-  for (int i = 0; i < m.getNumEdges(); ++i) {
-    const Mesh::Edge e = m.getEdge(i);
-    m.setNewEdgeVertex(e, (m.getNewFaceVertex(e.getFace(0)) + m.getNewFaceVertex(e.getFace(1)) + e.getVertex(0).getPosition() + e.getVertex(1).getPosition()) * 0.25);
-  }
-
-  for (int i = 0; i < m.getNumVertices(); ++i) {
-    const Mesh::Vertex v = m.getVertex(i);
-    Cvec3 rv = v.getPosition(), re(0), rf(0);
-    double n = 0;
-    Mesh::VertexIterator it(v.getIterator()), it0(it);
-    do {
-      re += it.getVertex().getPosition();
-      rf += m.getNewFaceVertex(it.getFace());
-    }
-    while (++n, ++it != it0);
-    m.setNewVertexVertex(v, rv * ((n-2)/n) + (re + rf) / (n*n));
-  }
-  m.subdivide();
-}
-
 static VertexPN getVertexPN(Mesh& m, const int face, const int vertex) {
   const Mesh::Face f = m.getFace(face);
-  const Cvec3 n = g_smoothSubdRendering ? f.getVertex(vertex).getNormal() : f.getNormal();
+  const Cvec3 n = f.getNormal();
   const Cvec3& v = f.getVertex(vertex).getPosition();
   return VertexPN(v[0], v[1], v[2], n[0], n[1], n[2]);
 }
@@ -437,9 +411,10 @@ static void drawArcBall(Uniforms& uniforms) {
 }
 
 static void drawStuff(bool picking) {
-//  clothCollisions();
-//  g_cloth.collision((*g_sphere2Node).getRbt().getTranslation()-clothTranslation,1);
-//  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
+  // every time we redraw, we update collisions so that cloth will always be
+  // in front of object
+  clothCollisions();
+  g_clothGeometry->upload(&(g_cloth.getVertices()[0]), g_cloth.getVertices().size());
 
   // if we are not translating, update arcball scale
   if (!(g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)))
@@ -480,20 +455,13 @@ static void drawStuff(bool picking) {
 
     cout << (g_currentPickedRbtNode ? "Part picked" : "No part picked") << endl;
   }
-
-
-
 }
 
 static void display() {
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
   drawStuff(false);
-
   glutSwapBuffers();
-
   checkGlErrors();
 }
 
@@ -508,9 +476,7 @@ static void pick() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   drawStuff(true);
 
-  // Uncomment below and comment out the glutPostRedisplay in mouse(...) call back
-  // to see result of the pick rendering pass
-  // glutSwapBuffers();
+  glutSwapBuffers();
 
   //Now set back the clear color
   glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
@@ -594,12 +560,6 @@ static RigTForm makeMixedFrame(const RigTForm& objRbt, const RigTForm& eyeRbt) {
   return transFact(objRbt) * linFact(eyeRbt);
 }
 
-// l = w X Y Z
-// o = l O
-// a = w A = l (Z Y X)^1 A = l A'
-// o = a (A')^-1 O
-//   => a M (A')^-1 O = l A' M (A')^-1 O
-
 static void motion(const int x, const int y) {
   if (!g_mouseClickDown)
     return;
@@ -657,7 +617,6 @@ static void mouse(const int button, const int state, const int x, const int y) {
   glutPostRedisplay();
 }
 
-
 static void keyboard(const unsigned char key, const int x, const int y) {
   switch (key) {
   case 27:
@@ -671,34 +630,40 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     << "a\t\tToggle display arcball\n"
     << "space\t\tRelease cloth\n"
     << "u\t\tUnfix 2 points on cloth\n"
-    << "w\t\tToggle cloth wireframe\n"
+    << "f\t\tToggle cloth wireframe\n"
+    << "w\t\tToggle wind\n"
+    << "r\t\tReturn the cloth to its original position\n"
+    << "b\t\tToggle between bunny and sphere\n"
     << endl;
     break;
   case 's':
     glFlush();
     writePpmScreenshot(g_windowWidth, g_windowHeight, "out.ppm");
     break;
-  case ' ':
-    g_cloth.unfix();
-    break;
   case 'p':
     g_pickingMode = !g_pickingMode;
     cerr << "Picking mode is " << (g_pickingMode ? "on" : "off") << endl;
     break;
-  case 'm':
-    g_activeCameraFrame = SkyMode((g_activeCameraFrame+1) % 2);
-    cerr << "Editing sky eye w.r.t. " << (g_activeCameraFrame == WORLD_SKY ? "world-sky frame\n" : "sky-sky frame\n") << endl;
-    break;
   case 'a':
     g_displayArcball = !g_displayArcball;
     break;
+
+  /// FINAL PROJECT KEYS ///
+  // release cloth
+  case ' ':
+    g_cloth.unfix();
+    break;
+  // release 2 of cloth's corners
   case 'u':
     g_cloth.unfix2();
     break;
+  // put cloth back to starting position
   case 'r':
     g_cloth = Cloth();
+    g_cloth.loadDimensions(5,5,45,45);
     break;
-  case 'w':
+  // toggle between wirefram and filled in cloth
+  case 'f':
     if (g_clothWire) {
         g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
         g_clothWire = false;
@@ -707,18 +672,28 @@ static void keyboard(const unsigned char key, const int x, const int y) {
         g_clothWire = true;
     }
     break;
+  // toggle wind
+  case 'w':
+    g_isWind = !g_isWind;
+    break;
+  // toggle between bunny and sphere
   case 'b':
     if (g_bunny) {
-        g_world->removeChild(g_bunnyNode);
+        g_spheres = g_normalSphere; // collisions with normal sphere
+        g_world->removeChild(g_bunnyNode); // remove bunny
+        addSphereNodes(g_normalSphere); // add normal sphere to scene
+        //removeSphereNodes(g_bunnySpheres);
         g_bunny = false;
     } else {
-        g_world->addChild(g_bunnyNode);
+        g_spheres = g_bunnySpheres; // collisions with bunny spheres
+        g_world->addChild(g_bunnyNode); // add bunny
+        removeSphereNodes(g_normalSphere);
+        //addSphereNodes(g_bunnySpheres);
         g_bunny = true;
     }
+    break;
   }
-
   glutPostRedisplay();
-
 }
 
 static void initGlutState(int argc, char * argv[]) {
@@ -732,7 +707,6 @@ static void initGlutState(int argc, char * argv[]) {
   glutMotionFunc(motion);                                 // mouse movement callback
   glutMouseFunc(mouse);                                   // mouse click callback
   glutKeyboardFunc(keyboard);
-//  glutSpecialFunc(specialKeyboard);                       // special keyboard callback
 }
 
 static void initGLState() {
@@ -767,9 +741,7 @@ static void updateBunnyMesh() {
       }
     }
   }
-
   g_bunnyGeometry->upload(&verts[0], verts.size());
-
 }
 
 // New function that loads the bunny mesh and initializes the bunny shell meshes
@@ -803,23 +775,22 @@ static void initMaterials() {
   // pick shader
   g_pickingMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"));
 
-  // shiny material
-  g_shinyMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader"));
-  g_shinyMat->getUniforms().put("uColor", Cvec3f(.6f, .6f, 0.f));
-
   // bunny material
   g_bunnyMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/bunny-gl3.fshader"));
   g_bunnyMat->getUniforms()
   .put("uColorAmbient", Cvec3f(0.45f, 0.3f, 0.3f))
   .put("uColorDiffuse", Cvec3f(0.2f, 0.2f, 0.2f));
 
+  // new sphere material based off diffuse
   g_sphereMat.reset(new Material(diffuse));
   g_sphereMat->getUniforms().put("uColor", Cvec3f(195./255., 9./255., 9./255.));
 
-  // copy solid prototype, and set to wireframed rendering
-  g_clothMat.reset(new Material("./shaders/basic-gl3.vshader", "./shaders/specular-gl3.fshader"));
-//  g_clothMat.reset(new Material("./shaders/velvet-gl2.vshader", "./shaders/velvet-gl2.fshader"));
-  g_clothMat->getUniforms().put("uColor", Cvec3f(102./255., 0./255., 153./255.));
+  /// FINAL PROJECT MATERIALS ///
+
+  // tried to use velvet material found from web, but it didn't work
+  g_clothMat.reset(new Material(diffuse));
+  //  g_clothMat.reset(new Material("./shaders/velvet-gl2.vshader", "./shaders/velvet-gl2.fshader"));
+  g_clothMat->getUniforms().put("uColor", Cvec3f(24./255., 0./255., 228./255.));
   g_clothMat->getRenderStates().polygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 };
@@ -828,30 +799,10 @@ static void initGeometry() {
   initGround();
   initSphere();
   initBunnyMeshes();
-  initCubes();
-
-  initSphere2();
-  initSpheres();
-  initCloth();
+  initSpheres(); // create geometry for new spheres
+  initCloth(); // create geometry for cloth
 }
 
-
-
-static void initSphereNodes() {
-    std::vector<struct sphereComp>::iterator it = g_spheres.begin();
-    for (int i = 0; i < g_spheres.size(); i++) {
-
-      float rad = (*it).radius;
-      Cvec3 scale = Cvec3(rad,rad,rad);
-      ((*it).node).reset(new SgRbtNode((*it).pos));
-      ((*it).node)->addChild(shared_ptr<MyShapeNode>(
-                              new MyShapeNode(g_sphere2, g_sphereMat,Cvec3(0,0,0),Cvec3(0,0,0),scale)));
-
-      g_world->addChild((*it).node);
-
-      ++it;
-    }
-}
 
 static void initScene() {
   g_world.reset(new SgRootNode());
@@ -877,28 +828,24 @@ static void initScene() {
   g_bunnyNode->addChild(shared_ptr<MyShapeNode>(
                           new MyShapeNode(g_bunnyGeometry, g_bunnyMat)));
 
-  g_sphere2Node.reset(new SgRbtNode());
-  g_sphere2Node->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_sphere2, g_sphereMat)));
-
-  initSphereNodes();
-
-  g_clothNode.reset(new SgRbtNode(Cvec3(0.0,0.0,0.0)));
+  // add cloth node to scene, translated appropiately
+  g_clothNode.reset(new SgRbtNode(clothTranslation));
   g_clothNode->addChild(shared_ptr<MyShapeNode>(
-                          new MyShapeNode(g_clothGeometry, g_clothMat, clothTranslation)));
+                          new MyShapeNode(g_clothGeometry, g_clothMat)));
+
+  initSphereNodes(); // create new nodes for objects built with spheres
 
   g_world->addChild(g_skyNode);
   g_world->addChild(g_groundNode);
   g_world->addChild(g_light1);
   g_world->addChild(g_light2);
-//  g_world->addChild(g_bunnyNode);
 
-//  g_world->addChild(g_sphere2Node);
   g_world->addChild(g_clothNode);
 
   g_currentCameraNode = g_skyNode;
 }
 
+// begin animation loop
 static void initAnimation() {
   animateCloth(0);
 }
@@ -919,7 +866,7 @@ int main(int argc, char * argv[]) {
     initMaterials();
     initGeometry();
     initScene();
-    initAnimation();
+    initAnimation(); // startall animations
     glutMainLoop();
 
     return 0;

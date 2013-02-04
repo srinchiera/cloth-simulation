@@ -4,21 +4,17 @@
 #include "cvec.h"
 #include <iostream>
 
-static const double AIR_RESISTANCE = 0.05;
-static const double TIME = 0.25;
-
 class Ball
 {
-  float mass;
   Cvec3 accel; //accel
-  	Cvec3 pos; //current position
+  Cvec3 pos; //current position
 	Cvec3 prevPos; //old position
 	Cvec3 normal; // normal
   bool canMove;
 
 public:
   Ball() {}
-	Ball(Cvec3 pos) : mass(1), accel(Cvec3()), pos(pos), prevPos(pos), normal(Cvec3()), canMove(true) {}
+	Ball(Cvec3 pos) : accel(Cvec3()), pos(pos), prevPos(pos), normal(Cvec3()), canMove(true) {}
 
 	void resetAccel() {
     accel = Cvec3();
@@ -36,18 +32,20 @@ public:
     normal = n;
   }
 
-	void newForce(Cvec3 force) {
-		accel += force/mass;
+	void addNormal (Cvec3 n) {
+		normal += n.normalize();
 	}
 
-	void timeStep() {
-		if(canMove)
-		{
-			Cvec3 tmp = pos;
-			pos = pos + (pos - prevPos) * (1.0 - AIR_RESISTANCE) + accel * TIME;
-			prevPos = tmp;
-			resetAccel();
-		}
+    Cvec3& getNormal() {
+    return normal;
+  }
+
+	void newForce(Cvec3 force) {
+		accel += force;
+	}
+
+  void minusForce(Cvec3 force) {
+		accel -= force;
 	}
 
 	Cvec3& getPos() {
@@ -55,12 +53,11 @@ public:
   }
 
 	void movePos(const Cvec3 v) {
-        if(canMove) {
-          pos += v;
-        }
-    }
+    if(canMove) 
+      pos += v;
+  }
 	void setPos(const Cvec3 v) {
-      pos = v;
+    pos = v;
   }
 
 	void fixMovement() {
@@ -71,13 +68,16 @@ public:
     canMove = true;
   }
 
-	void addNormal (Cvec3 normalVec) {
-		normal += normalVec.normalize();
+  void timeStep() {
+		if(canMove)
+		{
+			Cvec3 tmp = pos;
+      //account for air resistance in calculating distance moved
+			pos = accel * 0.25 + pos + (pos - prevPos) * 0.9;
+			prevPos = tmp;
+			resetAccel();
+		}
 	}
-
-    Cvec3& getNormal() {
-    return normal;
-  }
 };
 
 #endif	//ball_h

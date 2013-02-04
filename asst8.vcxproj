@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arcball.h" />
+    <ClInclude Include="ball.h" />
+    <ClInclude Include="cloth.h" />
     <ClInclude Include="cvec.h" />
     <ClInclude Include="geometry.h" />
     <ClInclude Include="geometrymaker.h" />
@@ -28,11 +30,12 @@
     <ClInclude Include="asstcommon.h" />
     <ClInclude Include="drawer.h" />
     <ClInclude Include="sgutils.h" />
+    <ClInclude Include="spring.h" />
     <ClInclude Include="texture.h" />
     <ClInclude Include="uniforms.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="asst7.cpp" />
+    <ClCompile Include="asst8.cpp" />
     <ClCompile Include="geometry.cpp" />
     <ClCompile Include="glsupport.cpp" />
     <ClCompile Include="material.cpp" />

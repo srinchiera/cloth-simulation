@@ -13,9 +13,6 @@
     <ClInclude Include="arcball.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="cvec.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="geometry.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -67,6 +64,18 @@
     <ClInclude Include="mesh.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="cloth.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="spring.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ball.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cvec.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glsupport.cpp">
@@ -81,9 +90,6 @@
     <ClCompile Include="picker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="asst7.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="material.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -94,6 +100,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="geometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="asst8.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
